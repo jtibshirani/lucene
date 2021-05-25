@@ -72,7 +72,7 @@ public class PythonEntryPoint {
             doc.add(new StoredField(ID_FIELD, id++));
 
             FieldType vectorFieldType = VectorField.createHnswType(vector.length,
-                    VectorValues.SearchStrategy.EUCLIDEAN_HNSW, 16, 500);
+                    VectorValues.SimilarityFunction.EUCLIDEAN, 16, 500);
             doc.add(new VectorField(VECTOR_FIELD, vector, vectorFieldType));
             indexWriter.addDocument(doc);
         }
