@@ -22,6 +22,7 @@ import org.apache.lucene.codecs.CompoundFormat;
 import org.apache.lucene.codecs.DocValuesFormat;
 import org.apache.lucene.codecs.FieldInfosFormat;
 import org.apache.lucene.codecs.FilterCodec;
+import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.codecs.LiveDocsFormat;
 import org.apache.lucene.codecs.NormsFormat;
 import org.apache.lucene.codecs.PointsFormat;
@@ -29,10 +30,9 @@ import org.apache.lucene.codecs.PostingsFormat;
 import org.apache.lucene.codecs.SegmentInfoFormat;
 import org.apache.lucene.codecs.StoredFieldsFormat;
 import org.apache.lucene.codecs.TermVectorsFormat;
-import org.apache.lucene.codecs.VectorFormat;
 import org.apache.lucene.codecs.perfield.PerFieldDocValuesFormat;
+import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.apache.lucene.codecs.perfield.PerFieldPostingsFormat;
-import org.apache.lucene.codecs.perfield.PerFieldVectorFormat;
 
 /**
  * Implements the Lucene 9.0 index format
@@ -63,8 +63,9 @@ public class Lucene90Codec extends Codec {
   private final SegmentInfoFormat segmentInfosFormat = new Lucene90SegmentInfoFormat();
   private final LiveDocsFormat liveDocsFormat = new Lucene90LiveDocsFormat();
   private final CompoundFormat compoundFormat = new Lucene90CompoundFormat();
-  private final PostingsFormat defaultFormat;
+  private final NormsFormat normsFormat = new Lucene90NormsFormat();
 
+  private final PostingsFormat defaultPostingsFormat;
   private final PostingsFormat postingsFormat =
       new PerFieldPostingsFormat() {
         @Override
@@ -73,6 +74,7 @@ public class Lucene90Codec extends Codec {
         }
       };
 
+  private final DocValuesFormat defaultDVFormat;
   private final DocValuesFormat docValuesFormat =
       new PerFieldDocValuesFormat() {
         @Override
@@ -81,11 +83,12 @@ public class Lucene90Codec extends Codec {
         }
       };
 
-  private final VectorFormat vectorFormat =
-      new PerFieldVectorFormat() {
+  private final KnnVectorsFormat defaultKnnVectorsFormat;
+  private final KnnVectorsFormat knnVectorsFormat =
+      new PerFieldKnnVectorsFormat() {
         @Override
-        public VectorFormat getVectorFormatForField(String field) {
-          return new Lucene90HnswVectorFormat();
+        public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
+          return Lucene90Codec.this.getKnnVectorsFormatForField(field);
         }
       };
 
@@ -105,8 +108,9 @@ public class Lucene90Codec extends Codec {
     super("Lucene90");
     this.storedFieldsFormat =
         new Lucene90StoredFieldsFormat(Objects.requireNonNull(mode).storedMode);
-    this.defaultFormat = new Lucene90PostingsFormat();
+    this.defaultPostingsFormat = new Lucene90PostingsFormat();
     this.defaultDVFormat = new Lucene90DocValuesFormat();
+    this.defaultKnnVectorsFormat = new Lucene90HnswVectorsFormat();
   }
 
   @Override
@@ -150,8 +154,8 @@ public class Lucene90Codec extends Codec {
   }
 
   @Override
-  public final VectorFormat vectorFormat() {
-    return vectorFormat;
+  public final KnnVectorsFormat knnVectorsFormat() {
+    return knnVectorsFormat;
   }
 
   /**
@@ -163,7 +167,7 @@ public class Lucene90Codec extends Codec {
    * future version of Lucene are only guaranteed to be able to read the default implementation,
    */
   public PostingsFormat getPostingsFormatForField(String field) {
-    return defaultFormat;
+    return defaultPostingsFormat;
   }
 
   /**
@@ -179,14 +183,22 @@ public class Lucene90Codec extends Codec {
     return defaultDVFormat;
   }
 
+  /**
+   * Returns the vectors format that should be used for writing new segments of <code>field</code>
+   *
+   * <p>The default implementation always returns "Lucene90".
+   *
+   * <p><b>WARNING:</b> if you subclass, you are responsible for index backwards compatibility:
+   * future version of Lucene are only guaranteed to be able to read the default implementation.
+   */
+  public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
+    return defaultKnnVectorsFormat;
+  }
+
   @Override
   public final DocValuesFormat docValuesFormat() {
     return docValuesFormat;
   }
-
-  private final DocValuesFormat defaultDVFormat;
-
-  private final NormsFormat normsFormat = new Lucene90NormsFormat();
 
   @Override
   public final NormsFormat normsFormat() {
