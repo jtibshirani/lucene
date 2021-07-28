@@ -17,17 +17,18 @@
 
 package org.apache.lucene.search;
 
-import org.apache.lucene.codecs.Codec;
+import org.apache.lucene.codecs.KnnVectorsFormat;
+import org.apache.lucene.codecs.lucene90.Lucene90Codec;
+import org.apache.lucene.codecs.lucene90.Lucene90HnswVectorsFormat;
 import org.apache.lucene.document.Document;
-import org.apache.lucene.document.FieldType;
+import org.apache.lucene.document.KnnVectorField;
 import org.apache.lucene.document.StoredField;
-import org.apache.lucene.document.VectorField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexableField;
-import org.apache.lucene.index.VectorValues;
+import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.MMapDirectory;
 import py4j.GatewayServer;
@@ -59,7 +60,12 @@ public class PythonEntryPoint {
 
         IndexWriterConfig iwc = new IndexWriterConfig();
         iwc.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
-        iwc.setCodec(Codec.forName("Lucene90"));
+        iwc.setCodec(new Lucene90Codec() {
+            @Override
+            public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
+                return new Lucene90HnswVectorsFormat(15, 500);
+            }
+        });
         indexWriter = new IndexWriter(directory, iwc);
     }
 
@@ -70,10 +76,7 @@ public class PythonEntryPoint {
         for (float[] vector : vectors) {
             Document doc = new Document();
             doc.add(new StoredField(ID_FIELD, id++));
-
-            FieldType vectorFieldType = VectorField.createHnswType(vector.length,
-                    VectorValues.SimilarityFunction.EUCLIDEAN, 16, 500);
-            doc.add(new VectorField(VECTOR_FIELD, vector, vectorFieldType));
+            doc.add(new KnnVectorField(VECTOR_FIELD, vector, VectorSimilarityFunction.EUCLIDEAN));
             indexWriter.addDocument(doc);
         }
     }
@@ -90,8 +93,7 @@ public class PythonEntryPoint {
         IndexReader indexReader = DirectoryReader.open(directory);
         IndexSearcher searcher = new IndexSearcher(indexReader);
         for (float[] queryVector : queryVectors) {
-            Query query = new KnnQuery(VECTOR_FIELD, "dummy text", queryVector, k, numCands - k);
-
+            Query query = new KnnQuery(VECTOR_FIELD, "dummy text", queryVector, k, numCands);
             TopDocs topDocs = searcher.search(query, k);
 
             List<Integer> result = new ArrayList<>(k);
