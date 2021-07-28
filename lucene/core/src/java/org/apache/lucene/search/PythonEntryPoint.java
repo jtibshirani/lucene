@@ -28,6 +28,7 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexableField;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.MMapDirectory;
@@ -91,10 +92,8 @@ public class PythonEntryPoint {
         List<List<Integer>> results = new ArrayList<>();
 
         IndexReader indexReader = DirectoryReader.open(directory);
-        IndexSearcher searcher = new IndexSearcher(indexReader);
         for (float[] queryVector : queryVectors) {
-            Query query = new KnnQuery(VECTOR_FIELD, "dummy text", queryVector, k, numCands);
-            TopDocs topDocs = searcher.search(query, k);
+            TopDocs topDocs = search(indexReader, queryVector, k, numCands);
 
             List<Integer> result = new ArrayList<>(k);
             for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
@@ -109,6 +108,18 @@ public class PythonEntryPoint {
         
         indexReader.close();
         return results;
+    }
+
+    private TopDocs search(IndexReader reader, float[] vector, int k, int numCands) throws IOException {
+        TopDocs[] results = new TopDocs[reader.leaves().size()];
+        for (LeafReaderContext ctx : reader.leaves()) {
+            results[ctx.ord] = ctx.reader().searchNearestVectors(VECTOR_FIELD, vector, numCands);
+            int docBase = ctx.docBase;
+            for (ScoreDoc scoreDoc : results[ctx.ord].scoreDocs) {
+                scoreDoc.doc += docBase;
+            }
+        }
+        return TopDocs.merge(k, results);
     }
 
     public float[][] deserializeMatrix(byte[] data) {
