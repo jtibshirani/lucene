@@ -64,7 +64,7 @@ public class PythonEntryPoint {
         iwc.setCodec(new Lucene90Codec() {
             @Override
             public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
-                return new Lucene90HnswVectorsFormat(15, 500);
+                return new Lucene90HnswVectorsFormat(16, 500);
             }
         });
         indexWriter = new IndexWriter(directory, iwc);
