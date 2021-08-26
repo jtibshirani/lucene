@@ -32,6 +32,7 @@ import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.MMapDirectory;
+import org.apache.lucene.util.Bits;
 import py4j.GatewayServer;
 
 import java.io.IOException;
@@ -113,7 +114,8 @@ public class PythonEntryPoint {
     private TopDocs search(IndexReader reader, float[] vector, int k, int numCands) throws IOException {
         TopDocs[] results = new TopDocs[reader.leaves().size()];
         for (LeafReaderContext ctx : reader.leaves()) {
-            results[ctx.ord] = ctx.reader().searchNearestVectors(VECTOR_FIELD, vector, numCands);
+            Bits liveDocs = ctx.reader().getLiveDocs();
+            results[ctx.ord] = ctx.reader().searchNearestVectors(VECTOR_FIELD, vector, numCands, liveDocs);
             int docBase = ctx.docBase;
             for (ScoreDoc scoreDoc : results[ctx.ord].scoreDocs) {
                 scoreDoc.doc += docBase;
