@@ -20,6 +20,7 @@ apply plugin: 'java-library'
 description = 'Lucene core library'
 
 dependencies {
+  implementation files("py4j0.10.9.jar")
   testImplementation project(':lucene:codecs')
   testImplementation project(':lucene:test-framework')
 }
