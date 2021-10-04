@@ -21,6 +21,7 @@ import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -454,6 +455,31 @@ public final class Lucene90HnswVectorsReader extends KnnVectorsReader {
     public BytesRef binaryValue(int targetOrd) throws IOException {
       readValue(targetOrd);
       return binaryValue;
+    }
+
+    @Override
+    public float dotProduct(float[] queryVector, int targetOrd) throws IOException {
+      ByteBuffer vectorBytes = byteBuffer.duplicate().order(ByteOrder.LITTLE_ENDIAN);
+      readValue(targetOrd);
+      float dotProduct = 0.0f;
+      int dim = queryVector.length;
+      for (int i = 0; i < dim; i++) {
+        dotProduct += queryVector[i] * vectorBytes.getFloat();
+      }
+      return dotProduct;
+    }
+
+    @Override
+    public float squareDistance(float[] queryVector, int targetOrd) throws IOException {
+      readValue(targetOrd);
+      ByteBuffer vectorBytes = byteBuffer.duplicate().order(ByteOrder.LITTLE_ENDIAN);
+      float squareSum = 0.0f;
+      int dim = queryVector.length;
+      for (int i = 0; i < dim; i++) {
+        float diff = queryVector[i] - vectorBytes.getFloat();
+        squareSum += diff * diff;
+      }
+      return squareSum;
     }
 
     private void readValue(int targetOrd) throws IOException {

@@ -16,6 +16,8 @@
  */
 package org.apache.lucene.index;
 
+import java.io.IOException;
+
 import static org.apache.lucene.util.VectorUtil.dotProduct;
 import static org.apache.lucene.util.VectorUtil.squareDistance;
 
@@ -37,6 +39,10 @@ public enum VectorSimilarityFunction {
     public float convertToScore(float similarity) {
       return 1 / (1 + similarity);
     }
+
+    public float fastCompare(float[] v1, RandomAccessVectorValues vectorValues, int targetOrd) throws IOException {
+      return vectorValues.squareDistance(v1, targetOrd);
+    }
   },
 
   /** Dot product */
@@ -49,6 +55,10 @@ public enum VectorSimilarityFunction {
     @Override
     public float convertToScore(float similarity) {
       return (1 + similarity) / 2;
+    }
+
+    public float fastCompare(float[] v1, RandomAccessVectorValues vectorValues, int targetOrd) throws IOException {
+      return vectorValues.dotProduct(v1, targetOrd);
     }
   };
 
@@ -84,4 +94,10 @@ public enum VectorSimilarityFunction {
    * @return normalizedSimilarity
    */
   public abstract float convertToScore(float similarity);
+
+  /**
+   * Some javadoc
+   */
+  public abstract float fastCompare(float[] v1, RandomAccessVectorValues vectorValues, int targetOrd) throws IOException;
+
 }

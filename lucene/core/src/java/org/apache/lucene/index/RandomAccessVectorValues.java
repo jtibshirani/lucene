@@ -19,6 +19,7 @@ package org.apache.lucene.index;
 
 import java.io.IOException;
 import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.VectorUtil;
 
 /**
  * Provides random access to vectors by dense ordinal.
@@ -49,4 +50,12 @@ public interface RandomAccessVectorValues {
    * @param targetOrd a valid ordinal, &ge; 0 and &lt; {@link #size()}.
    */
   BytesRef binaryValue(int targetOrd) throws IOException;
+
+  default float dotProduct(float[] queryVector, int targetOrd) throws IOException {
+    return VectorUtil.dotProduct(queryVector, vectorValue(targetOrd));
+  }
+
+  default float squareDistance(float[] queryVector, int targetOrd) throws IOException {
+    return VectorUtil.squareDistance(queryVector, vectorValue(targetOrd));
+  }
 }

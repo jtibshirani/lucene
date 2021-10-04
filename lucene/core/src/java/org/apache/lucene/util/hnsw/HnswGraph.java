@@ -114,7 +114,7 @@ public final class HnswGraph extends KnnGraphValues {
       int entryPoint = random.nextInt(size);
       if (visited.getAndSet(entryPoint) == false) {
         // explore the topK starting points of some random numSeed probes
-        float score = similarityFunction.compare(query, vectors.vectorValue(entryPoint));
+        float score = similarityFunction.fastCompare(query, vectors, entryPoint);
         candidates.add(entryPoint, score);
         if (acceptOrds == null || acceptOrds.get(entryPoint)) {
           results.add(entryPoint, score);
@@ -144,7 +144,7 @@ public final class HnswGraph extends KnnGraphValues {
           continue;
         }
 
-        float score = similarityFunction.compare(query, vectors.vectorValue(friendOrd));
+        float score = similarityFunction.fastCompare(query, vectors, friendOrd);
         if (results.size() < numSeed || bound.check(score) == false) {
           candidates.add(friendOrd, score);
           if (acceptOrds == null || acceptOrds.get(friendOrd)) {

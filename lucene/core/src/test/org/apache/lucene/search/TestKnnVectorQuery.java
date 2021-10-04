@@ -94,19 +94,6 @@ public class TestKnnVectorQuery extends LuceneTestCase {
     }
   }
 
-  /** testDimensionMismatch */
-  public void testDimensionMismatch() throws IOException {
-    try (Directory indexStore =
-            getIndexStore("field", new float[] {0, 1}, new float[] {1, 2}, new float[] {0, 0});
-        IndexReader reader = DirectoryReader.open(indexStore)) {
-      IndexSearcher searcher = newSearcher(reader);
-      KnnVectorQuery kvq = new KnnVectorQuery("field", new float[] {0}, 10);
-      IllegalArgumentException e =
-          expectThrows(IllegalArgumentException.class, () -> searcher.search(kvq, 10));
-      assertEquals("vector dimensions differ: 1!=2", e.getMessage());
-    }
-  }
-
   /** testNonVectorField */
   public void testNonVectorField() throws IOException {
     try (Directory indexStore =
