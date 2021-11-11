@@ -23,9 +23,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.SplittableRandom;
+
+import org.apache.lucene.codecs.lucene90.Lucene90HnswVectorsReader;
 import org.apache.lucene.index.KnnGraphValues;
 import org.apache.lucene.index.RandomAccessVectorValues;
 import org.apache.lucene.index.VectorSimilarityFunction;
+import org.apache.lucene.index.VectorValues;
+import org.apache.lucene.search.DocIdSetIterator;
+import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.SparseFixedBitSet;
 

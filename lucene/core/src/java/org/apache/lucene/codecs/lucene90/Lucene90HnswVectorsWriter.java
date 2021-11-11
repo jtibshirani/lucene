@@ -129,15 +129,17 @@ public final class Lucene90HnswVectorsWriter extends KnnVectorsWriter {
     long vectorDataLength = vectorData.getFilePointer() - vectorDataOffset;
     long vectorIndexOffset = vectorIndex.getFilePointer();
     if (vectors instanceof RandomAccessVectorValuesProducer) {
-      writeGraph(
-          vectorIndex,
-          (RandomAccessVectorValuesProducer) vectors,
-          fieldInfo.getVectorSimilarityFunction(),
-          vectorIndexOffset,
-          offsets,
-          count,
-          maxConn,
-          beamWidth);
+      if (vectors.size() > 1000) {
+        writeGraph(
+                vectorIndex,
+                (RandomAccessVectorValuesProducer) vectors,
+                fieldInfo.getVectorSimilarityFunction(),
+                vectorIndexOffset,
+                offsets,
+                count,
+                maxConn,
+                beamWidth);
+      }
     } else {
       throw new IllegalArgumentException(
           "Indexing an HNSW graph requires a random access vector values, got " + vectors);

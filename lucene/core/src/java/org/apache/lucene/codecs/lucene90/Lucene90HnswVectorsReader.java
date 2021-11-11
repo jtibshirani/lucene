@@ -37,6 +37,8 @@ import org.apache.lucene.index.RandomAccessVectorValuesProducer;
 import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.index.VectorValues;
+import org.apache.lucene.search.DocIdSetIterator;
+import org.apache.lucene.search.HitQueue;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TotalHits;
@@ -244,17 +246,22 @@ public final class Lucene90HnswVectorsReader extends KnnVectorsReader {
     k = Math.min(k, fieldEntry.size());
 
     OffHeapVectorValues vectorValues = getOffHeapVectorValues(fieldEntry);
+    Bits acceptOrds = getAcceptOrds(acceptDocs, fieldEntry);
+
+    if (vectorValues.size() <= 1000) {
+      return scanAllValues(target, k, vectorValues, fieldEntry.similarityFunction, acceptDocs);
+    }
+
     // use a seed that is fixed for the index so we get reproducible results for the same query
     final SplittableRandom random = new SplittableRandom(checksumSeed);
-    NeighborQueue results =
-        HnswGraph.search(
+    NeighborQueue results = HnswGraph.search(
             target,
             k,
             k,
             vectorValues,
             fieldEntry.similarityFunction,
             getGraphValues(fieldEntry),
-            getAcceptOrds(acceptDocs, fieldEntry),
+            acceptOrds,
             random);
     int i = 0;
     ScoreDoc[] scoreDocs = new ScoreDoc[Math.min(results.size(), k)];
@@ -267,8 +274,32 @@ public final class Lucene90HnswVectorsReader extends KnnVectorsReader {
     // always return >= the case where we can assert == is only when there are fewer than topK
     // vectors in the index
     return new TopDocs(
-        new TotalHits(results.visitedCount(), TotalHits.Relation.GREATER_THAN_OR_EQUAL_TO),
-        scoreDocs);
+            new TotalHits(results.visitedCount(), TotalHits.Relation.GREATER_THAN_OR_EQUAL_TO),
+            scoreDocs);
+  }
+
+  private static TopDocs scanAllValues(
+          float[] target,
+          int k,
+          VectorValues vectors,
+          VectorSimilarityFunction similarityFunction,
+          Bits acceptDocs) throws IOException {
+    HitQueue queue = new HitQueue(k, false);
+
+    int doc;
+    while ((doc = vectors.nextDoc()) != DocIdSetIterator.NO_MORE_DOCS) {
+      if (acceptDocs != null && acceptDocs.get(doc) == false) {
+        continue;
+      }
+      float[] vector = vectors.vectorValue();
+      float score = similarityFunction.convertToScore(similarityFunction.compare(vector, target));
+      queue.insertWithOverflow(new ScoreDoc(doc, score));
+    }
+    ScoreDoc[] topScoreDocs = new ScoreDoc[queue.size()];
+    for (int i = topScoreDocs.length - 1; i >= 0; i--) {
+      topScoreDocs[i] = queue.pop();
+    }
+    return new TopDocs(new TotalHits(vectors.size(), TotalHits.Relation.EQUAL_TO), topScoreDocs);
   }
 
   private OffHeapVectorValues getOffHeapVectorValues(FieldEntry fieldEntry) throws IOException {
