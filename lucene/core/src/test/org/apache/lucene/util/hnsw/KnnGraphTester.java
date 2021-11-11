@@ -285,6 +285,13 @@ public class KnnGraphTester {
   private void forceMerge() throws IOException {
     IndexWriterConfig iwc = new IndexWriterConfig().setOpenMode(IndexWriterConfig.OpenMode.APPEND);
     iwc.setInfoStream(new PrintStreamInfoStream(System.out));
+    iwc.setCodec(
+            new Lucene90Codec() {
+              @Override
+              public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
+                return new Lucene90HnswVectorsFormat(maxConn, beamWidth);
+              }
+            });
     System.out.println("Force merge index in " + indexPath);
     try (IndexWriter iw = new IndexWriter(FSDirectory.open(indexPath), iwc)) {
       iw.forceMerge(1);
@@ -580,7 +587,7 @@ public class KnnGraphTester {
           }
         });
     // iwc.setMergePolicy(NoMergePolicy.INSTANCE);
-    iwc.setRAMBufferSizeMB(1994d);
+//    iwc.setRAMBufferSizeMB(100);
     // iwc.setMaxBufferedDocs(10000);
 
     FieldType fieldType = KnnVectorField.createFieldType(dim, VectorSimilarityFunction.DOT_PRODUCT);
