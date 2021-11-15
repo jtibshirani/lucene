@@ -248,7 +248,7 @@ public final class Lucene90HnswVectorsReader extends KnnVectorsReader {
     OffHeapVectorValues vectorValues = getOffHeapVectorValues(fieldEntry);
     Bits acceptOrds = getAcceptOrds(acceptDocs, fieldEntry);
 
-    if (vectorValues.size() <= 50000) {
+    if (vectorValues.size() <= 10000) {
       return scanAllValues(target, k, vectorValues, fieldEntry.similarityFunction, acceptDocs);
     }
 
