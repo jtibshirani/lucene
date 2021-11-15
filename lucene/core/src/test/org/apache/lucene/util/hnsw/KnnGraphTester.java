@@ -34,15 +34,18 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.Locale;
+import java.util.Random;
 import java.util.Set;
 import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.codecs.lucene90.Lucene90Codec;
 import org.apache.lucene.codecs.lucene90.Lucene90HnswVectorsFormat;
 import org.apache.lucene.codecs.lucene90.Lucene90HnswVectorsReader;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
 import org.apache.lucene.document.KnnVectorField;
 import org.apache.lucene.document.StoredField;
+import org.apache.lucene.document.StringField;
 import org.apache.lucene.index.CodecReader;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
@@ -53,13 +56,24 @@ import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.RandomAccessVectorValues;
 import org.apache.lucene.index.RandomAccessVectorValuesProducer;
+import org.apache.lucene.index.Term;
 import org.apache.lucene.index.VectorSimilarityFunction;
+import org.apache.lucene.search.BulkScorer;
+import org.apache.lucene.search.DocIdSetIterator;
+import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.ScoreMode;
+import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.search.Weight;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.BitDocIdSet;
+import org.apache.lucene.util.BitSet;
+import org.apache.lucene.util.BitSetIterator;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.FixedBitSet;
 import org.apache.lucene.util.IntroSorter;
 import org.apache.lucene.util.PrintStreamInfoStream;
 import org.apache.lucene.util.SuppressForbidden;
@@ -76,6 +90,7 @@ public class KnnGraphTester {
   private static final String ID_FIELD = "id";
   private static final VectorSimilarityFunction SIMILARITY_FUNCTION =
       VectorSimilarityFunction.DOT_PRODUCT;
+  private static final float MATCH_PERCENT = 0.01f;
 
   private int numDocs;
   private int dim;
@@ -357,17 +372,27 @@ public class KnnGraphTester {
         for (int i = 0; i < warmCount; i++) {
           // warm up
           targets.get(target);
-          results[i] = doKnnSearch(reader, KNN_FIELD, target, topK, fanout);
+          results[i] = doKnnSearch(reader, null, KNN_FIELD, target, topK, fanout);
         }
         targets.position(0);
         start = System.nanoTime();
         cpuTimeStartNs = bean.getCurrentThreadCpuTime();
+
+        Random random = new Random();
+        BitSet randomLiveDocs = new FixedBitSet(reader.maxDoc());
+        for (int i = 0; i < randomLiveDocs.length(); i++) {
+          if (random.nextFloat() < MATCH_PERCENT) {
+            randomLiveDocs.set(i);
+          }
+        }
+
         for (int i = 0; i < numIters; i++) {
           targets.get(target);
-          results[i] = doKnnSearch(reader, KNN_FIELD, target, topK, fanout);
+          results[i] = doKnnSearch(reader, randomLiveDocs, KNN_FIELD, target, topK, fanout);
         }
         totalCpuTime = (bean.getCurrentThreadCpuTime() - cpuTimeStartNs) / 1_000_000;
         elapsed = (System.nanoTime() - start) / 1_000_000; // ns -> ms
+
         for (int i = 0; i < numIters; i++) {
           totalVisited += results[i].totalHits.value;
           for (ScoreDoc doc : results[i].scoreDocs) {
@@ -422,10 +447,13 @@ public class KnnGraphTester {
   }
 
   private static TopDocs doKnnSearch(
-      IndexReader reader, String field, float[] vector, int k, int fanout) throws IOException {
+      IndexReader reader, Bits liveDocs, String field, float[] vector, int k, int fanout) throws IOException {
     TopDocs[] results = new TopDocs[reader.leaves().size()];
+    if (reader.leaves().size() > 1) {
+      throw new IllegalStateException("must force merge first");
+    }
+
     for (LeafReaderContext ctx : reader.leaves()) {
-      Bits liveDocs = ctx.reader().getLiveDocs();
       results[ctx.ord] = ctx.reader().searchNearestVectors(field, vector, k + fanout, liveDocs);
       int docBase = ctx.docBase;
       for (ScoreDoc scoreDoc : results[ctx.ord].scoreDocs) {
@@ -607,7 +635,6 @@ public class KnnGraphTester {
           for (; vectors.hasRemaining() && i < numDocs; i++) {
             vectors.get(vector);
             Document doc = new Document();
-            // System.out.println("vector=" + vector[0] + "," + vector[1] + "...");
             doc.add(new KnnVectorField(KNN_FIELD, vector, fieldType));
             doc.add(new StoredField(ID_FIELD, i));
             iw.addDocument(doc);
