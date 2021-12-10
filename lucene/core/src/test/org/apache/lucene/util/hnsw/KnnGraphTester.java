@@ -54,8 +54,11 @@ import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.RandomAccessVectorValues;
 import org.apache.lucene.index.RandomAccessVectorValuesProducer;
 import org.apache.lucene.index.VectorSimilarityFunction;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.KnnVectorQuery;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.search.TopScoreDocCollector;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.Bits;
@@ -422,17 +425,11 @@ public class KnnGraphTester {
   }
 
   private static TopDocs doKnnSearch(
-      IndexReader reader, String field, float[] vector, int k, int fanout) throws IOException {
-    TopDocs[] results = new TopDocs[reader.leaves().size()];
-    for (LeafReaderContext ctx : reader.leaves()) {
-      Bits liveDocs = ctx.reader().getLiveDocs();
-      results[ctx.ord] = ctx.reader().searchNearestVectors(field, vector, k + fanout, liveDocs);
-      int docBase = ctx.docBase;
-      for (ScoreDoc scoreDoc : results[ctx.ord].scoreDocs) {
-        scoreDoc.doc += docBase;
-      }
-    }
-    return TopDocs.merge(k, results);
+          IndexReader reader, String field, float[] vector, int k, int fanout) throws IOException {
+    IndexSearcher searcher = new IndexSearcher(reader);
+    TopScoreDocCollector collector = TopScoreDocCollector.create(k, null, 1);
+    searcher.search(new KnnVectorQuery(field, vector, k + fanout), collector);
+    return collector.topDocs();
   }
 
   private float checkResults(TopDocs[] results, int[][] nn) {
@@ -580,7 +577,7 @@ public class KnnGraphTester {
           }
         });
     // iwc.setMergePolicy(NoMergePolicy.INSTANCE);
-    iwc.setRAMBufferSizeMB(1994d);
+    iwc.setRAMBufferSizeMB(128d);
     // iwc.setMaxBufferedDocs(10000);
 
     FieldType fieldType = KnnVectorField.createFieldType(dim, VectorSimilarityFunction.DOT_PRODUCT);
