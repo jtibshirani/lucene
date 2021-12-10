@@ -104,11 +104,11 @@ public class TestPerFieldKnnVectorsFormat extends BaseKnnVectorsFormatTestCase {
       try (IndexReader ireader = DirectoryReader.open(directory)) {
         LeafReader reader = ireader.leaves().get(0).reader();
         TopDocs hits1 =
-            reader.searchNearestVectors("field1", new float[] {1, 2, 3}, 10, reader.getLiveDocs());
+            reader.searchNearestVectors("field1", new float[] {1, 2, 3}, 10, reader.getLiveDocs(), 0);
         assertEquals(1, hits1.scoreDocs.length);
 
         TopDocs hits2 =
-            reader.searchNearestVectors("field2", new float[] {1, 2, 3}, 10, reader.getLiveDocs());
+            reader.searchNearestVectors("field2", new float[] {1, 2, 3}, 10, reader.getLiveDocs(), 0);
         assertEquals(1, hits2.scoreDocs.length);
       }
     }

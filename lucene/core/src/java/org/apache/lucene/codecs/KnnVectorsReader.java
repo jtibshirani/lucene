@@ -60,8 +60,31 @@ public abstract class KnnVectorsReader implements Closeable, Accountable {
    *     if they are all allowed to match.
    * @return the k nearest neighbor documents, along with their (searchStrategy-specific) scores.
    */
-  public abstract TopDocs search(String field, float[] target, int k, Bits acceptDocs)
-      throws IOException;
+  public TopDocs search(String field, float[] target, int k, Bits acceptDocs) throws IOException {
+    return search(field, target, k, acceptDocs, 0);
+  }
+
+
+  /**
+   * Return the k nearest neighbor documents as determined by comparison of their vector values for
+   * this field, to the given vector, by the field's similarity function. The score of each document
+   * is derived from the vector similarity in a way that ensures scores are positive and that a
+   * larger score corresponds to a higher ranking.
+   *
+   * <p>The search is allowed to be approximate, meaning the results are not guaranteed to be the
+   * true k closest neighbors. For large values of k (for example when k is close to the total
+   * number of documents), the search may also retrieve fewer than k documents.
+   *
+   * @param field the vector field to search
+   * @param target the vector-valued query
+   * @param k the number of docs to return
+   * @param acceptDocs {@link Bits} that represents the allowed documents to match, or {@code null}
+   *     if they are all allowed to match.
+   * @param minScore the minimum required score for results
+   * @return the k nearest neighbor documents, along with their (searchStrategy-specific) scores.
+   */
+  public abstract TopDocs search(String field, float[] target, int k, Bits acceptDocs, float minScore)
+          throws IOException;
 
   /**
    * Returns an instance optimized for merging. This instance may only be consumed in the thread

@@ -79,8 +79,7 @@ public final class HnswGraph extends KnnGraphValues {
    *
    * @param query search query vector
    * @param topK the number of nodes to be returned
-   * @param numSeed the size of the queue maintained while searching, and controls the number of
-   *     random entry points to sample
+   * @param minSimilarity the minimum similarity required for the results
    * @param vectors vector values
    * @param graphValues the graph values. May represent the entire graph, or a level in a
    *     hierarchical graph.
@@ -93,6 +92,7 @@ public final class HnswGraph extends KnnGraphValues {
       float[] query,
       int topK,
       int numSeed,
+      float minSimilarity,
       RandomAccessVectorValues vectors,
       VectorSimilarityFunction similarityFunction,
       KnnGraphValues graphValues,
@@ -105,6 +105,12 @@ public final class HnswGraph extends KnnGraphValues {
     NeighborQueue results = new NeighborQueue(numSeed, similarityFunction.reversed);
     // MAX heap, from which to pull the candidate nodes
     NeighborQueue candidates = new NeighborQueue(numSeed, !similarityFunction.reversed);
+
+    // Set the bound to the worst current result and below reject any newly-generated candidates
+    // failing
+    // to exceed this bound
+    BoundsChecker bound = BoundsChecker.create(similarityFunction.reversed);
+    bound.set(minSimilarity);
 
     // set of ordinals that have been visited by search on this layer, used to avoid backtracking
     SparseFixedBitSet visited = new SparseFixedBitSet(size);
@@ -122,11 +128,7 @@ public final class HnswGraph extends KnnGraphValues {
       }
     }
 
-    // Set the bound to the worst current result and below reject any newly-generated candidates
-    // failing
-    // to exceed this bound
-    BoundsChecker bound = BoundsChecker.create(similarityFunction.reversed);
-    bound.set(results.topScore());
+    bound.update(results.topScore());
     while (candidates.size() > 0) {
       // get the best candidate (closest or best scoring)
       float topCandidateScore = candidates.topScore();
@@ -145,11 +147,11 @@ public final class HnswGraph extends KnnGraphValues {
         }
 
         float score = similarityFunction.compare(query, vectors.vectorValue(friendOrd));
-        if (results.size() < numSeed || bound.check(score) == false) {
+        if (results.size() < topK || bound.check(score) == false) {
           candidates.add(friendOrd, score);
           if (acceptOrds == null || acceptOrds.get(friendOrd)) {
             results.insertWithOverflow(friendOrd, score);
-            bound.set(results.topScore());
+            bound.update(results.topScore());
           }
         }
       }

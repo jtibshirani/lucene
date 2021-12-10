@@ -874,7 +874,7 @@ public abstract class BaseKnnVectorsFormatTestCase extends BaseIndexFileFormatTe
             k = numLiveDocsWithVectors;
           }
           TopDocs results =
-              ctx.reader().searchNearestVectors(fieldName, randomVector(dimension), k, liveDocs);
+              ctx.reader().searchNearestVectors(fieldName, randomVector(dimension), k, liveDocs, 0);
           assertEquals(Math.min(k, size), results.scoreDocs.length);
           for (int i = 0; i < k - 1; i++) {
             assertTrue(results.scoreDocs[i].score >= results.scoreDocs[i + 1].score);

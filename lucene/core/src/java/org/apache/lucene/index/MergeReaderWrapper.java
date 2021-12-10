@@ -204,9 +204,9 @@ class MergeReaderWrapper extends LeafReader {
   }
 
   @Override
-  public TopDocs searchNearestVectors(String field, float[] target, int k, Bits acceptDocs)
+  public TopDocs searchNearestVectors(String field, float[] target, int k, Bits acceptDocs, float minScore)
       throws IOException {
-    return in.searchNearestVectors(field, target, k, acceptDocs);
+    return in.searchNearestVectors(field, target, k, acceptDocs, minScore);
   }
 
   @Override

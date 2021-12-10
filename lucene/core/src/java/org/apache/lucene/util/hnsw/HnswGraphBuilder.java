@@ -135,9 +135,10 @@ public final class HnswGraphBuilder {
   /** Inserts a doc with vector value to the graph */
   void addGraphNode(float[] value) throws IOException {
     // We pass 'null' for acceptOrds because there are no deletions while building the graph
+    float minSimilarity = similarityFunction.convertToSimilarity(0);
     NeighborQueue candidates =
         HnswGraph.search(
-            value, beamWidth, beamWidth, vectorValues, similarityFunction, hnsw, null, random);
+            value, beamWidth, beamWidth, minSimilarity, vectorValues, similarityFunction, hnsw, null, random);
 
     int node = hnsw.addNode();
 

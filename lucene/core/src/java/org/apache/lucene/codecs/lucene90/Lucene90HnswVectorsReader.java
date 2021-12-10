@@ -235,6 +235,12 @@ public final class Lucene90HnswVectorsReader extends KnnVectorsReader {
 
   @Override
   public TopDocs search(String field, float[] target, int k, Bits acceptDocs) throws IOException {
+    return search(field, target, k, acceptDocs, 0);
+
+  }
+
+  @Override
+  public TopDocs search(String field, float[] target, int k, Bits acceptDocs, float minScore) throws IOException {
     FieldEntry fieldEntry = fields.get(field);
     if (fieldEntry == null || fieldEntry.dimension == 0) {
       return null;
@@ -246,11 +252,13 @@ public final class Lucene90HnswVectorsReader extends KnnVectorsReader {
     OffHeapVectorValues vectorValues = getOffHeapVectorValues(fieldEntry);
     // use a seed that is fixed for the index so we get reproducible results for the same query
     final SplittableRandom random = new SplittableRandom(checksumSeed);
+    float minSimilarity = fieldEntry.similarityFunction.convertToSimilarity(minScore);
     NeighborQueue results =
         HnswGraph.search(
             target,
             k,
             k,
+            minSimilarity,
             vectorValues,
             fieldEntry.similarityFunction,
             getGraphValues(fieldEntry),

@@ -138,6 +138,7 @@ public class TestHnswGraph extends LuceneTestCase {
             new float[] {1, 0},
             10,
             10,
+            -1,
             vectors.randomAccess(),
             VectorSimilarityFunction.DOT_PRODUCT,
             hnsw,
@@ -179,6 +180,7 @@ public class TestHnswGraph extends LuceneTestCase {
             new float[] {1, 0},
             10,
             10,
+            -1,
             vectors.randomAccess(),
             VectorSimilarityFunction.DOT_PRODUCT,
             hnsw,
@@ -214,6 +216,7 @@ public class TestHnswGraph extends LuceneTestCase {
             new float[] {1, 0},
             10,
             10,
+            -1,
             vectors.randomAccess(),
             VectorSimilarityFunction.DOT_PRODUCT,
             hnsw,
@@ -351,6 +354,7 @@ public class TestHnswGraph extends LuceneTestCase {
     VectorSimilarityFunction similarityFunction =
         VectorSimilarityFunction.values()[
             random().nextInt(VectorSimilarityFunction.values().length - 1) + 1];
+
     HnswGraphBuilder builder =
         new HnswGraphBuilder(vectors, similarityFunction, 10, 30, random().nextLong());
     HnswGraph hnsw = builder.build(vectors);
@@ -364,6 +368,7 @@ public class TestHnswGraph extends LuceneTestCase {
               query,
               topK,
               100,
+              similarityFunction.convertToSimilarity(0),
               vectors,
               similarityFunction,
               hnsw,

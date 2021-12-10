@@ -58,21 +58,29 @@ public class KnnVectorQuery extends Query {
 
   @Override
   public Query rewrite(IndexReader reader) throws IOException {
-    TopDocs[] perLeafResults = new TopDocs[reader.leaves().size()];
+    float minScore = 0.0f;
+    TopDocs topK = null;
     for (LeafReaderContext ctx : reader.leaves()) {
-      perLeafResults[ctx.ord] = searchLeaf(ctx, k);
+      TopDocs results = searchLeaf(ctx, k, minScore);
+      if (topK == null) {
+        topK = results;
+      } else {
+        topK = TopDocs.merge(k, new TopDocs[]{topK, results});
+      }
+      if (topK.scoreDocs.length == k) {
+        minScore = topK.scoreDocs[k - 1].score;
+      }
     }
-    // Merge sort the results
-    TopDocs topK = TopDocs.merge(k, perLeafResults);
-    if (topK.scoreDocs.length == 0) {
+
+    if (topK == null || topK.scoreDocs.length == 0) {
       return new MatchNoDocsQuery();
     }
     return createRewrittenQuery(reader, topK);
   }
 
-  private TopDocs searchLeaf(LeafReaderContext ctx, int kPerLeaf) throws IOException {
+  private TopDocs searchLeaf(LeafReaderContext ctx, int kPerLeaf, float minScore) throws IOException {
     Bits liveDocs = ctx.reader().getLiveDocs();
-    TopDocs results = ctx.reader().searchNearestVectors(field, target, kPerLeaf, liveDocs);
+    TopDocs results = ctx.reader().searchNearestVectors(field, target, kPerLeaf, liveDocs, minScore);
     if (results == null) {
       return NO_RESULTS;
     }

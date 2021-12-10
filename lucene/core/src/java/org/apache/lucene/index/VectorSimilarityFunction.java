@@ -36,6 +36,11 @@ public enum VectorSimilarityFunction {
     public float convertToScore(float similarity) {
       return 1 / (1 + similarity);
     }
+
+    @Override
+    public float convertToSimilarity(float score) {
+      return 1 / score - 1;
+    }
   },
 
   /**
@@ -54,6 +59,11 @@ public enum VectorSimilarityFunction {
     public float convertToScore(float similarity) {
       return (1 + similarity) / 2;
     }
+
+    @Override
+    public float convertToSimilarity(float score) {
+      return score * 2 - 1;
+    }
   },
 
   /**
@@ -71,6 +81,11 @@ public enum VectorSimilarityFunction {
     @Override
     public float convertToScore(float similarity) {
       return (1 + similarity) / 2;
+    }
+
+    @Override
+    public float convertToSimilarity(float score) {
+      return score * 2 - 1;
     }
   };
 
@@ -106,4 +121,12 @@ public enum VectorSimilarityFunction {
    * @return normalizedSimilarity
    */
   public abstract float convertToScore(float similarity);
+
+  /**
+   * Converts document scores into similarity scores.
+   *
+   * @param score the document score used when assembling search hits
+   * @return the raw internal score as returned by {@link #compare(float[], float[])}.
+   */
+  public abstract float convertToSimilarity(float score);
 }

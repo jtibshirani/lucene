@@ -99,8 +99,8 @@ public class AssertingKnnVectorsFormat extends KnnVectorsFormat {
     }
 
     @Override
-    public TopDocs search(String field, float[] target, int k, Bits acceptDocs) throws IOException {
-      TopDocs hits = delegate.search(field, target, k, acceptDocs);
+    public TopDocs search(String field, float[] target, int k, Bits acceptDocs, float minScore) throws IOException {
+      TopDocs hits = delegate.search(field, target, k, acceptDocs, minScore);
       assert hits != null;
       assert hits.scoreDocs.length <= k;
       return hits;
