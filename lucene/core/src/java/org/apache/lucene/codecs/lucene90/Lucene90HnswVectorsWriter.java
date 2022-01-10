@@ -17,13 +17,6 @@
 
 package org.apache.lucene.codecs.lucene90;
 
-import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.codecs.KnnVectorsReader;
 import org.apache.lucene.codecs.KnnVectorsWriter;
@@ -36,14 +29,26 @@ import org.apache.lucene.index.RandomAccessVectorValuesProducer;
 import org.apache.lucene.index.SegmentWriteState;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.index.VectorValues;
-import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.store.ByteBuffersDataInput;
+import org.apache.lucene.store.ByteBuffersDataOutput;
+import org.apache.lucene.store.ByteBuffersIndexInput;
+import org.apache.lucene.store.ByteBuffersIndexOutput;
+import org.apache.lucene.store.DataOutput;
+import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.store.IndexOutput;
-import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.IOUtils;
 import org.apache.lucene.util.hnsw.HnswGraph;
 import org.apache.lucene.util.hnsw.HnswGraphBuilder;
 import org.apache.lucene.util.hnsw.NeighborArray;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
 
 /**
  * Writes vector values and knn graphs to index segments.
@@ -135,9 +140,12 @@ public final class Lucene90HnswVectorsWriter extends KnnVectorsWriter {
       writeVectorValue(vectors);
       docIds[count] = docV;
     }
+
     // count may be < vectors.size() e,g, if some documents were deleted
     long[] offsets = new long[count];
     long vectorDataLength = vectorData.getFilePointer() - vectorDataOffset;
+
+
     long vectorIndexOffset = vectorIndex.getFilePointer();
     if (vectors instanceof RandomAccessVectorValuesProducer) {
       writeGraph(
@@ -243,20 +251,73 @@ public final class Lucene90HnswVectorsWriter extends KnnVectorsWriter {
   }
 
   @Override
-  public void merge(MergeState mergeState) throws IOException {
-    for (int i = 0; i < mergeState.fieldInfos.length; i++) {
-      KnnVectorsReader reader = mergeState.knnVectorsReaders[i];
-      assert reader != null || mergeState.fieldInfos[i].hasVectorValues() == false;
-      if (reader != null) {
-        reader.checkIntegrity();
-      }
+  public void mergeVectors(FieldInfo mergeFieldInfo, final MergeState mergeState)
+      throws IOException {
+    if (mergeState.infoStream.isEnabled("VV")) {
+      mergeState.infoStream.message("VV", "merging " + mergeState.segmentInfo);
     }
-    for (FieldInfo fieldInfo : mergeState.mergeFieldInfos) {
-      if (fieldInfo.hasVectorValues()) {
-        mergeVectors(fieldInfo, mergeState);
-      }
+
+    VectorValues vectors = mergeVectorValues(mergeFieldInfo, mergeState);
+    ByteBuffersDataOutput output = new ByteBuffersDataOutput();
+
+    // TODO - use a better data structure; a bitset? DocsWithFieldSet is p.p. in o.a.l.index
+    int[] docIds = new int[vectors.size()];
+    int count = 0;
+    for (int docV = vectors.nextDoc(); docV != NO_MORE_DOCS; docV = vectors.nextDoc(), count++) {
+      // write vector value
+      BytesRef binaryValue = vectors.binaryValue();
+      assert binaryValue.length == vectors.dimension() * Float.BYTES;
+      output.writeBytes(binaryValue.bytes, binaryValue.offset, binaryValue.length);
+
+      // record ordinal
+      docIds[count] = docV;
     }
-    finish();
+
+    int vectorDataLength = count * vectors.dimension() * Float.BYTES;
+    int[] ordToDoc = Arrays.copyOf(docIds, count);
+
+    long pos = vectorData.getFilePointer();
+    // write floats aligned at 4 bytes. This will not survive CFS, but it shows a small benefit when
+    // CFS is not used, eg for larger indexes
+    long padding = (4 - (pos & 0x3)) & 0x3;
+    long vectorDataOffset = pos + padding;
+    for (int i = 0; i < padding; i++) {
+      vectorData.writeByte((byte) 0);
+    }
+
+    IndexInput vectorsInput = new ByteBuffersIndexInput(output.toDataInput(), "temporary vector data");
+    IndexInputVectorValues indexInputVectors = new IndexInputVectorValues(mergeFieldInfo, ordToDoc, vectorsInput);
+
+    // count may be < vectors.size() e,g, if some documents were deleted
+    long[] offsets = new long[count];
+    long vectorIndexOffset = vectorIndex.getFilePointer();
+    writeGraph(
+        vectorIndex,
+        indexInputVectors,
+        mergeFieldInfo.getVectorSimilarityFunction(),
+        vectorIndexOffset,
+        offsets,
+        count,
+        maxConn,
+        beamWidth);
+    long vectorIndexLength = vectorIndex.getFilePointer() - vectorIndexOffset;
+
+    if (vectorDataLength > 0) {
+      vectorData.copyBytes(output.toDataInput(), vectorDataLength);
+    }
+
+    writeMeta(
+        mergeFieldInfo,
+        vectorDataOffset,
+        vectorDataLength,
+        vectorIndexOffset,
+        vectorIndexLength,
+        count,
+        ordToDoc);
+    writeGraphOffsets(meta, offsets);
+    if (mergeState.infoStream.isEnabled("VV")) {
+      mergeState.infoStream.message("VV", "merge done " + mergeState.segmentInfo);
+    }
   }
 
   private VectorValues mergeVectorValues(FieldInfo mergeFieldInfo, MergeState mergeState) throws IOException {
@@ -299,54 +360,11 @@ public final class Lucene90HnswVectorsWriter extends KnnVectorsWriter {
         }
       }
     }
-    return new VectorValuesMerger(subs, mergeState);
-  }
-
-  private void mergeVectors(FieldInfo mergeFieldInfo, final MergeState mergeState)
-      throws IOException {
-    if (mergeState.infoStream.isEnabled("VV")) {
-      mergeState.infoStream.message("VV", "merging " + mergeState.segmentInfo);
-    }
-    // Create a new VectorValues by iterating over the sub vectors, mapping the resulting
-    // docids using docMaps in the mergeState.
-    writeField(
-        mergeFieldInfo,
-        new KnnVectorsReader() {
-          @Override
-          public long ramBytesUsed() {
-            return 0;
-          }
-
-          @Override
-          public void close() throws IOException {
-            throw new UnsupportedOperationException();
-          }
-
-          @Override
-          public void checkIntegrity() throws IOException {
-            throw new UnsupportedOperationException();
-          }
-
-          @Override
-          public VectorValues getVectorValues(String field) throws IOException {
-            return mergeVectorValues(mergeFieldInfo, mergeState);
-          }
-
-          @Override
-          public TopDocs search(String field, float[] target, int k, Bits acceptDocs)
-              throws IOException {
-            throw new UnsupportedOperationException();
-          }
-        });
-
-    if (mergeState.infoStream.isEnabled("VV")) {
-      mergeState.infoStream.message("VV", "merge done " + mergeState.segmentInfo);
-    }
+    return new MergedVectorValues(subs, mergeState);
   }
 
   /** Tracks state of one sub-reader that we are merging */
   private static class VectorValuesSub extends DocIDMerger.Sub {
-
     final VectorValues values;
     final int segmentIndex;
     int count;
@@ -370,11 +388,9 @@ public final class Lucene90HnswVectorsWriter extends KnnVectorsWriter {
   }
 
   /**
-   * View over multiple VectorValues supporting iterator-style access via DocIdMerger. Maintains a
-   * reverse ordinal mapping for documents having values in order to support random access by dense
-   * ordinal.
+   * View over multiple VectorValues supporting iterator-style access via DocIdMerger.
    */
-  private static class VectorValuesMerger extends VectorValues
+  private static class MergedVectorValues extends VectorValues
       implements RandomAccessVectorValuesProducer {
     private final List<VectorValuesSub> subs;
     private final DocIDMerger<VectorValuesSub> docIdMerger;
@@ -390,7 +406,7 @@ public final class Lucene90HnswVectorsWriter extends KnnVectorsWriter {
     private int[] ordMap;
     private int ord;
 
-    VectorValuesMerger(List<VectorValuesSub> subs, MergeState mergeState) throws IOException {
+    MergedVectorValues(List<VectorValuesSub> subs, MergeState mergeState) throws IOException {
       this.subs = subs;
       docIdMerger = DocIDMerger.of(subs, mergeState.needsIndexSort);
       int totalCost = 0, totalSize = 0;
@@ -447,7 +463,7 @@ public final class Lucene90HnswVectorsWriter extends KnnVectorsWriter {
 
     @Override
     public RandomAccessVectorValues randomAccess() {
-      return new VectorValuesMerger.MergerRandomAccess();
+      throw new UnsupportedOperationException();
     }
 
     @Override
@@ -469,52 +485,117 @@ public final class Lucene90HnswVectorsWriter extends KnnVectorsWriter {
     public int dimension() {
       return subs.get(0).values.dimension();
     }
+  }
 
-    class MergerRandomAccess implements RandomAccessVectorValues {
+  /** Read the vector values from the index input. This supports both iterated and random access. */
+  static class IndexInputVectorValues extends VectorValues
+      implements RandomAccessVectorValues, RandomAccessVectorValuesProducer {
 
-      private final List<RandomAccessVectorValues> raSubs;
+    private final FieldInfo fieldInfo;
+    private final int[] ordToDoc;
+    private final IndexInput dataIn;
 
-      MergerRandomAccess() {
-        raSubs = new ArrayList<>(subs.size());
-        for (VectorValuesSub sub : subs) {
-          if (sub.values instanceof RandomAccessVectorValuesProducer) {
-            raSubs.add(((RandomAccessVectorValuesProducer) sub.values).randomAccess());
-          } else {
-            throw new IllegalStateException(
-                "Cannot merge VectorValues without support for random access");
-          }
-        }
+    private final BytesRef binaryValue;
+    private final ByteBuffer byteBuffer;
+    private final int byteSize;
+    private final float[] value;
+
+    int ord = -1;
+    int doc = -1;
+
+    IndexInputVectorValues(FieldInfo fieldInfo, int[] ordToDoc, IndexInput dataIn) {
+      this.fieldInfo = fieldInfo;
+      this.ordToDoc = ordToDoc;
+      this.dataIn = dataIn;
+
+      int dimension = fieldInfo.getVectorDimension();
+      byteSize = Float.BYTES * dimension;
+      byteBuffer = ByteBuffer.allocate(byteSize);
+      value = new float[dimension];
+      binaryValue = new BytesRef(byteBuffer.array(), byteBuffer.arrayOffset(), byteSize);
+    }
+
+    @Override
+    public int dimension() {
+      return fieldInfo.getVectorDimension();
+    }
+
+    @Override
+    public int size() {
+      return ordToDoc.length;
+    }
+
+    @Override
+    public float[] vectorValue() throws IOException {
+      dataIn.seek((long) ord * byteSize);
+      dataIn.readFloats(value, 0, value.length);
+      return value;
+    }
+
+    @Override
+    public BytesRef binaryValue() throws IOException {
+      dataIn.seek((long) ord * byteSize);
+      dataIn.readBytes(byteBuffer.array(), byteBuffer.arrayOffset(), byteSize, false);
+      return binaryValue;
+    }
+
+    @Override
+    public int docID() {
+      return doc;
+    }
+
+    @Override
+    public int nextDoc() {
+      if (++ord >= size()) {
+        doc = NO_MORE_DOCS;
+      } else {
+        doc = ordToDoc[ord];
       }
+      return doc;
+    }
 
-      @Override
-      public int size() {
-        return size;
+    @Override
+    public int advance(int target) {
+      assert docID() < target;
+      ord = Arrays.binarySearch(ordToDoc, ord + 1, ordToDoc.length, target);
+      if (ord < 0) {
+        ord = -(ord + 1);
       }
+      assert ord <= ordToDoc.length;
+      if (ord == ordToDoc.length) {
+        doc = NO_MORE_DOCS;
+      } else {
+        doc = ordToDoc[ord];
+      }
+      return doc;
+    }
 
-      @Override
-      public int dimension() {
-        return VectorValuesMerger.this.dimension();
-      }
+    @Override
+    public long cost() {
+      return ordToDoc.length;
+    }
 
-      @Override
-      public float[] vectorValue(int target) throws IOException {
-        int unmappedOrd = ordMap[target];
-        int segmentOrd = Arrays.binarySearch(ordBase, unmappedOrd);
-        if (segmentOrd < 0) {
-          // get the index of the greatest lower bound
-          segmentOrd = -2 - segmentOrd;
-        }
-        while (segmentOrd < ordBase.length - 1 && ordBase[segmentOrd + 1] == ordBase[segmentOrd]) {
-          // forward over empty segments which will share the same ordBase
-          segmentOrd++;
-        }
-        return raSubs.get(segmentOrd).vectorValue(unmappedOrd - ordBase[segmentOrd]);
-      }
+    @Override
+    public RandomAccessVectorValues randomAccess() {
+      return new IndexInputVectorValues(fieldInfo, ordToDoc, dataIn.clone());
+    }
 
-      @Override
-      public BytesRef binaryValue(int targetOrd) throws IOException {
-        throw new UnsupportedOperationException();
-      }
+    @Override
+    public float[] vectorValue(int targetOrd) throws IOException {
+      dataIn.seek((long) targetOrd * byteSize);
+      dataIn.readFloats(value, 0, value.length);
+      return value;
+    }
+
+    @Override
+    public BytesRef binaryValue(int targetOrd) throws IOException {
+      readValue(targetOrd);
+      return binaryValue;
+    }
+
+    private void readValue(int targetOrd) throws IOException {
+      dataIn.seek((long) targetOrd * byteSize);
+      dataIn.readBytes(byteBuffer.array(), byteBuffer.arrayOffset(), byteSize);
     }
   }
 
