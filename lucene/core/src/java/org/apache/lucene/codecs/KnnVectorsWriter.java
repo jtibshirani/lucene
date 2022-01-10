@@ -65,7 +65,7 @@ public abstract class KnnVectorsWriter implements Closeable {
     finish();
   }
 
-  private void mergeVectors(FieldInfo mergeFieldInfo, final MergeState mergeState)
+  public void mergeVectors(FieldInfo mergeFieldInfo, final MergeState mergeState)
       throws IOException {
     if (mergeState.infoStream.isEnabled("VV")) {
       mergeState.infoStream.message("VV", "merging " + mergeState.segmentInfo);
