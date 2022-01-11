@@ -29,11 +29,6 @@ import org.apache.lucene.index.RandomAccessVectorValuesProducer;
 import org.apache.lucene.index.SegmentWriteState;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.index.VectorValues;
-import org.apache.lucene.store.ByteBuffersDataInput;
-import org.apache.lucene.store.ByteBuffersDataOutput;
-import org.apache.lucene.store.ByteBuffersIndexInput;
-import org.apache.lucene.store.ByteBuffersIndexOutput;
-import org.apache.lucene.store.DataOutput;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.util.BytesRef;
@@ -258,7 +253,8 @@ public final class Lucene90HnswVectorsWriter extends KnnVectorsWriter {
     }
 
     VectorValues vectors = mergeVectorValues(mergeFieldInfo, mergeState);
-    ByteBuffersDataOutput output = new ByteBuffersDataOutput();
+    IndexOutput vectorsOutput = segmentWriteState.directory.createTempOutput(vectorData.getName(), "temp",
+        segmentWriteState.context);
 
     // TODO - use a better data structure; a bitset? DocsWithFieldSet is p.p. in o.a.l.index
     int[] docIds = new int[vectors.size()];
@@ -267,12 +263,13 @@ public final class Lucene90HnswVectorsWriter extends KnnVectorsWriter {
       // write vector value
       BytesRef binaryValue = vectors.binaryValue();
       assert binaryValue.length == vectors.dimension() * Float.BYTES;
-      output.writeBytes(binaryValue.bytes, binaryValue.offset, binaryValue.length);
+      vectorsOutput.writeBytes(binaryValue.bytes, binaryValue.offset, binaryValue.length);
 
       // record ordinal
       docIds[count] = docV;
     }
 
+    vectorsOutput.close();
     int vectorDataLength = count * vectors.dimension() * Float.BYTES;
     int[] ordToDoc = Arrays.copyOf(docIds, count);
 
@@ -285,9 +282,10 @@ public final class Lucene90HnswVectorsWriter extends KnnVectorsWriter {
       vectorData.writeByte((byte) 0);
     }
 
-    IndexInput vectorsInput = new ByteBuffersIndexInput(output.toDataInput(), "temporary vector data");
-    IndexInputVectorValues indexInputVectors = new IndexInputVectorValues(mergeFieldInfo, ordToDoc, vectorsInput);
+    IndexInput vectorsInput = segmentWriteState.directory.openInput(vectorsOutput.getName(), segmentWriteState.context);
+    vectorData.copyBytes(vectorsInput.clone(), vectorDataLength);
 
+    IndexInputVectorValues indexInputVectors = new IndexInputVectorValues(mergeFieldInfo, ordToDoc, vectorsInput);
     // count may be < vectors.size() e,g, if some documents were deleted
     long[] offsets = new long[count];
     long vectorIndexOffset = vectorIndex.getFilePointer();
@@ -302,9 +300,8 @@ public final class Lucene90HnswVectorsWriter extends KnnVectorsWriter {
         beamWidth);
     long vectorIndexLength = vectorIndex.getFilePointer() - vectorIndexOffset;
 
-    if (vectorDataLength > 0) {
-      vectorData.copyBytes(output.toDataInput(), vectorDataLength);
-    }
+    vectorsInput.close();
+    segmentWriteState.directory.deleteFile(vectorsOutput.getName());
 
     writeMeta(
         mergeFieldInfo,
