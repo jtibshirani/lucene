@@ -27,7 +27,9 @@ import org.apache.lucene.index.KnnGraphValues;
 import org.apache.lucene.index.RandomAccessVectorValues;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.util.ArrayUtil;
+import org.apache.lucene.util.BitSet;
 import org.apache.lucene.util.Bits;
+import org.apache.lucene.util.FixedBitSet;
 import org.apache.lucene.util.SparseFixedBitSet;
 
 /**
@@ -113,15 +115,16 @@ public final class HnswGraph extends KnnGraphValues {
       KnnGraphValues graphValues,
       Bits acceptOrds)
       throws IOException {
-
+    int size = graphValues.size();
+    BitSet visitedOrds = new SparseFixedBitSet(size);
     NeighborQueue results;
     int[] eps = new int[] {graphValues.entryNode()};
     for (int level = graphValues.numLevels() - 1; level >= 1; level--) {
-      results = searchLevel(query, 1, level, eps, vectors, similarityFunction, graphValues, null);
+      results = searchLevel(query, 1, level, eps, vectors, similarityFunction, graphValues, null, visitedOrds);
       eps[0] = results.pop();
     }
     results =
-        searchLevel(query, topK, 0, eps, vectors, similarityFunction, graphValues, acceptOrds);
+        searchLevel(query, topK, 0, eps, vectors, similarityFunction, graphValues, acceptOrds, visitedOrds);
     return results;
   }
 
@@ -147,18 +150,18 @@ public final class HnswGraph extends KnnGraphValues {
       RandomAccessVectorValues vectors,
       VectorSimilarityFunction similarityFunction,
       KnnGraphValues graphValues,
-      Bits acceptOrds)
+      Bits acceptOrds,
+      BitSet visitedOrds)
       throws IOException {
-
     int size = graphValues.size();
+    visitedOrds.clear(0, visitedOrds.length());
     // MIN heap, holding the top results
     NeighborQueue results = new NeighborQueue(topK, similarityFunction.reversed);
     // MAX heap, from which to pull the candidate nodes
     NeighborQueue candidates = new NeighborQueue(topK, !similarityFunction.reversed);
     // set of ordinals that have been visited by search on this layer, used to avoid backtracking
-    SparseFixedBitSet visited = new SparseFixedBitSet(size);
     for (int ep : eps) {
-      if (visited.getAndSet(ep) == false) {
+      if (visitedOrds.getAndSet(ep) == false) {
         float score = similarityFunction.compare(query, vectors.vectorValue(ep));
         candidates.add(ep, score);
         if (acceptOrds == null || acceptOrds.get(ep)) {
@@ -184,7 +187,7 @@ public final class HnswGraph extends KnnGraphValues {
       int friendOrd;
       while ((friendOrd = graphValues.nextNeighbor()) != NO_MORE_DOCS) {
         assert friendOrd < size : "friendOrd=" + friendOrd + "; size=" + size;
-        if (visited.getAndSet(friendOrd)) {
+        if (visitedOrds.getAndSet(friendOrd)) {
           continue;
         }
 
@@ -202,7 +205,7 @@ public final class HnswGraph extends KnnGraphValues {
     while (results.size() > topK) {
       results.pop();
     }
-    results.setVisitedCount(visited.approximateCardinality());
+    results.setVisitedCount(visitedOrds.approximateCardinality());
     return results;
   }
 
