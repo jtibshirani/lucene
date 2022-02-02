@@ -28,6 +28,7 @@ import org.apache.lucene.index.RandomAccessVectorValues;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.util.ArrayUtil;
 import org.apache.lucene.util.Bits;
+import org.apache.lucene.util.FixedBitSet;
 import org.apache.lucene.util.SparseFixedBitSet;
 
 /**
@@ -156,7 +157,7 @@ public final class HnswGraph extends KnnGraphValues {
     // MAX heap, from which to pull the candidate nodes
     NeighborQueue candidates = new NeighborQueue(topK, !similarityFunction.reversed);
     // set of ordinals that have been visited by search on this layer, used to avoid backtracking
-    SparseFixedBitSet visited = new SparseFixedBitSet(size);
+    FixedBitSet visited = new FixedBitSet(size);
     for (int ep : eps) {
       if (visited.getAndSet(ep) == false) {
         float score = similarityFunction.compare(query, vectors.vectorValue(ep));
