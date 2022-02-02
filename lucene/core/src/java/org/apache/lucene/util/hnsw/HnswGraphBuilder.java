@@ -26,10 +26,9 @@ import java.util.SplittableRandom;
 import org.apache.lucene.index.RandomAccessVectorValues;
 import org.apache.lucene.index.RandomAccessVectorValuesProducer;
 import org.apache.lucene.index.VectorSimilarityFunction;
-import org.apache.lucene.util.BitSet;
+import org.apache.lucene.util.hnsw.HnswGraph.HnswSearchState;
 import org.apache.lucene.util.FixedBitSet;
 import org.apache.lucene.util.InfoStream;
-import org.apache.lucene.util.SparseFixedBitSet;
 
 /**
  * Builder for HNSW graph. See {@link HnswGraph} for a gloss on the algorithm and the meaning of the
@@ -49,7 +48,7 @@ public final class HnswGraphBuilder {
   private final int beamWidth;
   private final double ml;
   private final NeighborArray scratch;
-  private final BitSet visitedOrds;
+  private final HnswSearchState searchState;
   
   private final VectorSimilarityFunction similarityFunction;
   private final RandomAccessVectorValues vectorValues;
@@ -99,7 +98,9 @@ public final class HnswGraphBuilder {
     this.hnsw = new HnswGraph(maxConn, levelOfFirstNode);
     bound = BoundsChecker.create(similarityFunction.reversed);
     scratch = new NeighborArray(Math.max(beamWidth, maxConn + 1));
-    this.visitedOrds = new FixedBitSet(vectorValues.size());
+    this.searchState = new HnswSearchState(
+        new NeighborQueue(beamWidth, !similarityFunction.reversed),
+        new FixedBitSet(vectorValues.size()));
   }
 
   /**
@@ -146,19 +147,20 @@ public final class HnswGraphBuilder {
       hnsw.addNode(level, node);
     }
 
-    int size = hnsw.size();
     // for levels > nodeLevel search with topk = 1
     for (int level = curMaxLevel; level > nodeLevel; level--) {
       candidates =
-          HnswGraph.searchLevel(value, 1, level, eps, vectorValues, similarityFunction, hnsw, null, visitedOrds);
+          HnswGraph.searchLevel(value, 1, level, eps, vectorValues, similarityFunction, hnsw, null, searchState);
       eps = new int[] {candidates.pop()};
+      searchState.clear();
     }
     // for levels <= nodeLevel search with topk = beamWidth, and add connections
     for (int level = Math.min(nodeLevel, curMaxLevel); level >= 0; level--) {
       candidates =
           HnswGraph.searchLevel(
-              value, beamWidth, level, eps, vectorValues, similarityFunction, hnsw, null, visitedOrds);
+              value, beamWidth, level, eps, vectorValues, similarityFunction, hnsw, null, searchState);
       eps = candidates.nodes();
+      searchState.clear();
       hnsw.addNode(level, node);
       addDiverseNeighbors(level, node, candidates);
     }
