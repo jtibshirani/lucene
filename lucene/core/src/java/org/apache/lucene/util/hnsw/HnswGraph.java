@@ -154,7 +154,7 @@ public final class HnswGraph extends KnnGraphValues {
     // MIN heap, holding the top results
     NeighborQueue results = new NeighborQueue(topK, similarityFunction.reversed);
     // MAX heap, from which to pull the candidate nodes
-    NeighborQueue candidates = new NeighborQueue(topK, !similarityFunction.reversed);
+    NeighborQueue candidates = new NeighborQueue(topK * 10, !similarityFunction.reversed);
     // set of ordinals that have been visited by search on this layer, used to avoid backtracking
     SparseFixedBitSet visited = new SparseFixedBitSet(size);
     for (int ep : eps) {
