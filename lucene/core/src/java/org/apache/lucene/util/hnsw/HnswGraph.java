@@ -29,6 +29,7 @@ import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.util.ArrayUtil;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.SparseFixedBitSet;
+import org.apache.lucene.util.hppc.IntIntHashMap;
 
 /**
  * Hierarchical Navigable Small World graph. Provides efficient approximate nearest neighbor search
@@ -156,9 +157,9 @@ public final class HnswGraph extends KnnGraphValues {
     // MAX heap, from which to pull the candidate nodes
     NeighborQueue candidates = new NeighborQueue(topK, !similarityFunction.reversed);
     // set of ordinals that have been visited by search on this layer, used to avoid backtracking
-    SparseFixedBitSet visited = new SparseFixedBitSet(size);
+    IntIntHashMap visited = new IntIntHashMap(size);
     for (int ep : eps) {
-      if (visited.getAndSet(ep) == false) {
+      if (visited.putIfAbsent(ep, 1)) {
         float score = similarityFunction.compare(query, vectors.vectorValue(ep));
         candidates.add(ep, score);
         if (acceptOrds == null || acceptOrds.get(ep)) {
@@ -184,7 +185,7 @@ public final class HnswGraph extends KnnGraphValues {
       int friendOrd;
       while ((friendOrd = graphValues.nextNeighbor()) != NO_MORE_DOCS) {
         assert friendOrd < size : "friendOrd=" + friendOrd + "; size=" + size;
-        if (visited.getAndSet(friendOrd)) {
+        if (visited.putIfAbsent(friendOrd, 1) == false) {
           continue;
         }
 
@@ -202,7 +203,7 @@ public final class HnswGraph extends KnnGraphValues {
     while (results.size() > topK) {
       results.pop();
     }
-    results.setVisitedCount(visited.approximateCardinality());
+    results.setVisitedCount(visited.size());
     return results;
   }
 
