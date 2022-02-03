@@ -25,6 +25,7 @@ import org.apache.lucene.index.RandomAccessVectorValues;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.util.BitSet;
 import org.apache.lucene.util.Bits;
+import org.apache.lucene.util.FixedBitSet;
 import org.apache.lucene.util.SparseFixedBitSet;
 
 /**
@@ -80,7 +81,7 @@ public final class HnswGraphSearcher {
         new HnswGraphSearcher(
             similarityFunction,
             new NeighborQueue(topK, similarityFunction.reversed == false),
-            new SparseFixedBitSet(vectors.size()));
+            new FixedBitSet(vectors.size()));
     NeighborQueue results;
     int[] eps = new int[] {graphValues.entryNode()};
     for (int level = graphValues.numLevels() - 1; level >= 1; level--) {
