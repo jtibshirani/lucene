@@ -28,6 +28,7 @@ import org.apache.lucene.index.RandomAccessVectorValuesProducer;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.util.FixedBitSet;
 import org.apache.lucene.util.InfoStream;
+import org.apache.lucene.util.hppc.IntIntHashMap;
 
 /**
  * Builder for HNSW graph. See {@link HnswGraph} for a gloss on the algorithm and the meaning of the
@@ -100,7 +101,7 @@ public final class HnswGraphBuilder {
         new HnswGraphSearcher(
             similarityFunction,
             new NeighborQueue(beamWidth, similarityFunction.reversed == false),
-            new FixedBitSet(vectorValues.size()));
+            new IntIntHashMap());
     bound = BoundsChecker.create(similarityFunction.reversed);
     scratch = new NeighborArray(Math.max(beamWidth, maxConn + 1));
   }

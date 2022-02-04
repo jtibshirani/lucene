@@ -26,6 +26,7 @@ import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.util.BitSet;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.SparseFixedBitSet;
+import org.apache.lucene.util.hppc.IntIntHashMap;
 
 /**
  * Searches an HNSW graph to find nearest neighbors to a query vector. For more background on the
@@ -39,7 +40,7 @@ public final class HnswGraphSearcher {
    */
   private final NeighborQueue candidates;
 
-  private final BitSet visited;
+  private final IntIntHashMap visited;
 
   /**
    * Creates a new graph searcher.
@@ -49,7 +50,7 @@ public final class HnswGraphSearcher {
    * @param visited bit set that will track nodes that have already been visited
    */
   HnswGraphSearcher(
-      VectorSimilarityFunction similarityFunction, NeighborQueue candidates, BitSet visited) {
+      VectorSimilarityFunction similarityFunction, NeighborQueue candidates, IntIntHashMap visited) {
     this.similarityFunction = similarityFunction;
     this.candidates = candidates;
     this.visited = visited;
@@ -80,7 +81,7 @@ public final class HnswGraphSearcher {
         new HnswGraphSearcher(
             similarityFunction,
             new NeighborQueue(topK, similarityFunction.reversed == false),
-            new SparseFixedBitSet(vectors.size()));
+            new IntIntHashMap());
     NeighborQueue results;
     int[] eps = new int[] {graphValues.entryNode()};
     for (int level = graphValues.numLevels() - 1; level >= 1; level--) {
@@ -118,7 +119,7 @@ public final class HnswGraphSearcher {
     clearScratchState();
 
     for (int ep : eps) {
-      if (visited.getAndSet(ep) == false) {
+      if (visited.putIfAbsent(ep, 1)) {
         float score = similarityFunction.compare(query, vectors.vectorValue(ep));
         candidates.add(ep, score);
         if (acceptOrds == null || acceptOrds.get(ep)) {
@@ -144,7 +145,7 @@ public final class HnswGraphSearcher {
       int friendOrd;
       while ((friendOrd = graphValues.nextNeighbor()) != NO_MORE_DOCS) {
         assert friendOrd < size : "friendOrd=" + friendOrd + "; size=" + size;
-        if (visited.getAndSet(friendOrd)) {
+        if (visited.putIfAbsent(friendOrd, 1) == false) {
           continue;
         }
 
@@ -162,12 +163,12 @@ public final class HnswGraphSearcher {
     while (results.size() > topK) {
       results.pop();
     }
-    results.setVisitedCount(visited.approximateCardinality());
+    results.setVisitedCount(visited.size());
     return results;
   }
 
   private void clearScratchState() {
     candidates.clear();
-    visited.clear(0, visited.length());
+    visited.clear();
   }
 }
