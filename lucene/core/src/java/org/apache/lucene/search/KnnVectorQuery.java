@@ -35,7 +35,18 @@ import org.apache.lucene.util.BitSetIterator;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.FixedBitSet;
 
-/** Uses {@link KnnVectorsReader#search} to perform nearest neighbour search. */
+/**
+ * Uses {@link KnnVectorsReader#search} to perform nearest neighbour search.
+ *
+ * <p>This query also allows for performing a kNN search subject to a filter. In this case, it first
+ * executes the filter for each leaf, then chooses a strategy dynamically:
+ *
+ * <ul>
+ *   <li>If the filter cost is less than k, just execute an exact search
+ *   <li>Otherwise run a kNN search subject to the filter
+ *   <li>the kNN search visits too many vectors without completing, stop and run an exact search
+ * </ul>
+ */
 public class KnnVectorQuery extends Query {
 
   private static final TopDocs NO_RESULTS =
