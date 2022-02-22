@@ -17,13 +17,6 @@
 
 package org.apache.lucene.util.hnsw;
 
-import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
-
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Random;
-import java.util.Set;
 import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.codecs.lucene91.Lucene91Codec;
 import org.apache.lucene.codecs.lucene91.Lucene91HnswVectorsFormat;
@@ -51,6 +44,14 @@ import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.FixedBitSet;
 import org.apache.lucene.util.VectorUtil;
 import org.apache.lucene.util.hnsw.HnswGraph.NodesIterator;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Random;
+import java.util.Set;
+
+import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
 
 /** Tests HNSW KNN graphs */
 public class TestHnswGraph extends LuceneTestCase {
@@ -309,8 +310,8 @@ public class TestHnswGraph extends LuceneTestCase {
             createRandomAcceptOrds(0, vectors.size),
             visitedLimit);
     assertTrue(nn.incomplete());
-    // The visited count shouldn't be much over the limit
-    assertTrue(nn.visitedCount() < visitedLimit + 3);
+    // The visited count shouldn't exceed the limit
+    assertTrue(nn.visitedCount() <= visitedLimit);
   }
 
   public void testBoundsCheckerMax() {
