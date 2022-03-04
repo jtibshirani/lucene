@@ -87,7 +87,7 @@ public abstract class KnnVectorsWriter implements Closeable {
 
               @Override
               public TopDocs search(
-                  String field, float[] target, int k, Bits acceptDocs, int visitedLimit) {
+                  String field, float[] target, int k, Bits acceptDocs, int visitedLimit, float minScore) {
                 throw new UnsupportedOperationException();
               }
             });

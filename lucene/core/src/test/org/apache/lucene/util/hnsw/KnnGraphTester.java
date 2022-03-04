@@ -436,7 +436,7 @@ public class KnnGraphTester {
     for (LeafReaderContext ctx : reader.leaves()) {
       Bits liveDocs = ctx.reader().getLiveDocs();
       results[ctx.ord] =
-          ctx.reader().searchNearestVectors(field, vector, k + fanout, liveDocs, Integer.MAX_VALUE);
+          ctx.reader().searchNearestVectors(field, vector, k + fanout, liveDocs, Integer.MAX_VALUE, 0.0f);
       int docBase = ctx.docBase;
       for (ScoreDoc scoreDoc : results[ctx.ord].scoreDocs) {
         scoreDoc.doc += docBase;

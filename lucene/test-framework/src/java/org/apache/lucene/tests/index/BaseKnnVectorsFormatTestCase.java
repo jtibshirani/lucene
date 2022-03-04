@@ -566,7 +566,7 @@ public abstract class BaseKnnVectorsFormatTestCase extends BaseIndexFileFormatTe
         // assert that knn search doesn't fail on a field with all deleted docs
         TopDocs results =
             leafReader.searchNearestVectors(
-                "v", randomVector(3), 1, leafReader.getLiveDocs(), Integer.MAX_VALUE);
+                "v", randomVector(3), 1, leafReader.getLiveDocs(), Integer.MAX_VALUE, 0.0f);
         assertEquals(0, results.scoreDocs.length);
       }
     }
@@ -867,7 +867,7 @@ public abstract class BaseKnnVectorsFormatTestCase extends BaseIndexFileFormatTe
           TopDocs results =
               ctx.reader()
                   .searchNearestVectors(
-                      fieldName, randomVector(dimension), k, liveDocs, visitedLimit);
+                      fieldName, randomVector(dimension), k, liveDocs, visitedLimit, 0.0f);
           assertEquals(TotalHits.Relation.GREATER_THAN_OR_EQUAL_TO, results.totalHits.relation);
           assertEquals(visitedLimit, results.totalHits.value);
 
@@ -877,7 +877,7 @@ public abstract class BaseKnnVectorsFormatTestCase extends BaseIndexFileFormatTe
           results =
               ctx.reader()
                   .searchNearestVectors(
-                      fieldName, randomVector(dimension), k, liveDocs, visitedLimit);
+                      fieldName, randomVector(dimension), k, liveDocs, visitedLimit, 0.0f);
           assertEquals(TotalHits.Relation.EQUAL_TO, results.totalHits.relation);
           assertTrue(results.totalHits.value <= visitedLimit);
         }
@@ -954,7 +954,7 @@ public abstract class BaseKnnVectorsFormatTestCase extends BaseIndexFileFormatTe
           TopDocs results =
               ctx.reader()
                   .searchNearestVectors(
-                      fieldName, randomVector(dimension), k, liveDocs, Integer.MAX_VALUE);
+                      fieldName, randomVector(dimension), k, liveDocs, Integer.MAX_VALUE, 0.0f);
           assertEquals(Math.min(k, size), results.scoreDocs.length);
           for (int i = 0; i < k - 1; i++) {
             assertTrue(results.scoreDocs[i].score >= results.scoreDocs[i + 1].score);

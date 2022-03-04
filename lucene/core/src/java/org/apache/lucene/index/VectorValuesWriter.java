@@ -136,7 +136,7 @@ class VectorValuesWriter {
 
           @Override
           public TopDocs search(
-              String field, float[] target, int k, Bits acceptDocs, int visitedLimit)
+              String field, float[] target, int k, Bits acceptDocs, int visitedLimit, float minScore)
               throws IOException {
             throw new UnsupportedOperationException();
           }

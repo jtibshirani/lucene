@@ -144,7 +144,7 @@ public class SimpleTextKnnVectorsReader extends KnnVectorsReader {
   }
 
   @Override
-  public TopDocs search(String field, float[] target, int k, Bits acceptDocs, int visitedLimit)
+  public TopDocs search(String field, float[] target, int k, Bits acceptDocs, int visitedLimit, float minScore)
       throws IOException {
     VectorValues values = getVectorValues(field);
     if (target.length != values.dimension()) {

@@ -75,10 +75,11 @@ public abstract class KnnVectorsReader implements Closeable, Accountable {
    * @param acceptDocs {@link Bits} that represents the allowed documents to match, or {@code null}
    *     if they are all allowed to match.
    * @param visitedLimit the maximum number of nodes that the search is allowed to visit
+   * @param minScore the minimum score required for a document to match
    * @return the k nearest neighbor documents, along with their (searchStrategy-specific) scores.
    */
   public abstract TopDocs search(
-      String field, float[] target, int k, Bits acceptDocs, int visitedLimit) throws IOException;
+      String field, float[] target, int k, Bits acceptDocs, int visitedLimit, float minScore) throws IOException;
 
   /**
    * Returns an instance optimized for merging. This instance may only be consumed in the thread

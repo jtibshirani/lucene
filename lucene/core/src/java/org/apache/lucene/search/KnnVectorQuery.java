@@ -104,14 +104,21 @@ public class KnnVectorQuery extends Query {
       indexSearcher.search(booleanQuery, filterCollector);
     }
 
+    float minScore = 0.0f;
+    int numResults = 0;
     for (LeafReaderContext ctx : reader.leaves()) {
-      TopDocs results = searchLeaf(ctx, filterCollector);
+      TopDocs results = searchLeaf(ctx, filterCollector, minScore);
       if (ctx.docBase > 0) {
         for (ScoreDoc scoreDoc : results.scoreDocs) {
           scoreDoc.doc += ctx.docBase;
         }
       }
       perLeafResults[ctx.ord] = results;
+
+      numResults += results.scoreDocs.length;
+      if (numResults >= k && results.scoreDocs.length > 0) {
+        minScore = Math.max(minScore, results.scoreDocs[results.scoreDocs.length - 1].score);
+      }
     }
     // Merge sort the results
     TopDocs topK = TopDocs.merge(k, perLeafResults);
@@ -121,12 +128,12 @@ public class KnnVectorQuery extends Query {
     return createRewrittenQuery(reader, topK);
   }
 
-  private TopDocs searchLeaf(LeafReaderContext ctx, BitSetCollector filterCollector)
+  private TopDocs searchLeaf(LeafReaderContext ctx, BitSetCollector filterCollector, float minScore)
       throws IOException {
 
     if (filterCollector == null) {
       Bits acceptDocs = ctx.reader().getLiveDocs();
-      return approximateSearch(ctx, acceptDocs, Integer.MAX_VALUE);
+      return approximateSearch(ctx, acceptDocs, Integer.MAX_VALUE, minScore);
     } else {
       BitSetIterator filterIterator = filterCollector.getIterator(ctx.ord);
       if (filterIterator == null || filterIterator.cost() == 0) {
@@ -143,7 +150,7 @@ public class KnnVectorQuery extends Query {
       Bits acceptDocs =
           filterIterator.getBitSet(); // The filter iterator already incorporates live docs
       int visitedLimit = (int) filterIterator.cost();
-      TopDocs results = approximateSearch(ctx, acceptDocs, visitedLimit);
+      TopDocs results = approximateSearch(ctx, acceptDocs, visitedLimit, minScore);
       if (results.totalHits.relation == TotalHits.Relation.EQUAL_TO) {
         return results;
       } else {
@@ -153,10 +160,10 @@ public class KnnVectorQuery extends Query {
     }
   }
 
-  private TopDocs approximateSearch(LeafReaderContext context, Bits acceptDocs, int visitedLimit)
+  private TopDocs approximateSearch(LeafReaderContext context, Bits acceptDocs, int visitedLimit, float minScore)
       throws IOException {
     TopDocs results =
-        context.reader().searchNearestVectors(field, target, k, acceptDocs, visitedLimit);
+        context.reader().searchNearestVectors(field, target, k, acceptDocs, visitedLimit, minScore);
     return results != null ? results : NO_RESULTS;
   }
 

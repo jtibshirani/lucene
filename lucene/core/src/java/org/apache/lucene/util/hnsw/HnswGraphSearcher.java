@@ -54,6 +54,18 @@ public final class HnswGraphSearcher {
     this.visited = visited;
   }
 
+  static NeighborQueue search(
+      float[] query,
+      int topK,
+      RandomAccessVectorValues vectors,
+      VectorSimilarityFunction similarityFunction,
+      HnswGraph graph,
+      Bits acceptOrds,
+      int visitedLimit)
+      throws IOException {
+    return search(query, topK, vectors, similarityFunction, graph, acceptOrds, visitedLimit, -1.0f);
+  }
+
   /**
    * Searches HNSW graph for the nearest neighbors of a query vector.
    *
@@ -75,7 +87,8 @@ public final class HnswGraphSearcher {
       VectorSimilarityFunction similarityFunction,
       HnswGraph graph,
       Bits acceptOrds,
-      int visitedLimit)
+      int visitedLimit,
+      float minSimilarity)
       throws IOException {
     HnswGraphSearcher graphSearcher =
         new HnswGraphSearcher(
@@ -86,14 +99,14 @@ public final class HnswGraphSearcher {
     int[] eps = new int[] {graph.entryNode()};
     int numVisited = 0;
     for (int level = graph.numLevels() - 1; level >= 1; level--) {
-      results = graphSearcher.searchLevel(query, 1, level, eps, vectors, graph, null, visitedLimit);
+      results = graphSearcher.searchLevel(query, 1, level, eps, vectors, graph, null, visitedLimit, 0.0f);
       eps[0] = results.pop();
 
       numVisited += results.visitedCount();
       visitedLimit -= results.visitedCount();
     }
     results =
-        graphSearcher.searchLevel(query, topK, 0, eps, vectors, graph, acceptOrds, visitedLimit);
+        graphSearcher.searchLevel(query, topK, 0, eps, vectors, graph, acceptOrds, visitedLimit, minSimilarity);
     results.setVisitedCount(results.visitedCount() + numVisited);
     return results;
   }
@@ -120,7 +133,7 @@ public final class HnswGraphSearcher {
       RandomAccessVectorValues vectors,
       HnswGraph graph)
       throws IOException {
-    return searchLevel(query, topK, level, eps, vectors, graph, null, Integer.MAX_VALUE);
+    return searchLevel(query, topK, level, eps, vectors, graph, null, Integer.MAX_VALUE, -1.0f);
   }
 
   private NeighborQueue searchLevel(
@@ -131,7 +144,8 @@ public final class HnswGraphSearcher {
       RandomAccessVectorValues vectors,
       HnswGraph graph,
       Bits acceptOrds,
-      int visitedLimit)
+      int visitedLimit,
+      float minSimilarity)
       throws IOException {
     int size = graph.size();
     NeighborQueue results = new NeighborQueue(topK, similarityFunction.reversed);
@@ -156,8 +170,9 @@ public final class HnswGraphSearcher {
     // A bound that holds the minimum similarity to the query vector that a candidate vector must
     // have to be considered.
     BoundsChecker bound = BoundsChecker.create(similarityFunction.reversed);
+    bound.set(minSimilarity);
     if (results.size() >= topK) {
-      bound.set(results.topScore());
+      bound.update(results.topScore());
     }
     while (candidates.size() > 0 && results.incomplete() == false) {
       // get the best candidate (closest or best scoring)
@@ -185,7 +200,7 @@ public final class HnswGraphSearcher {
           candidates.add(friendOrd, score);
           if (acceptOrds == null || acceptOrds.get(friendOrd)) {
             if (results.insertWithOverflow(friendOrd, score) && results.size() >= topK) {
-              bound.set(results.topScore());
+              bound.update(results.topScore());
             }
           }
         }

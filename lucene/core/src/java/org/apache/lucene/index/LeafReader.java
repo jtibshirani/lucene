@@ -229,11 +229,12 @@ public abstract class LeafReader extends IndexReader {
    * @param acceptDocs {@link Bits} that represents the allowed documents to match, or {@code null}
    *     if they are all allowed to match.
    * @param visitedLimit the maximum number of nodes that the search is allowed to visit
+   * @param minScore the minimum score required for a document to match
    * @return the k nearest neighbor documents, along with their (searchStrategy-specific) scores.
    * @lucene.experimental
    */
   public abstract TopDocs searchNearestVectors(
-      String field, float[] target, int k, Bits acceptDocs, int visitedLimit) throws IOException;
+      String field, float[] target, int k, Bits acceptDocs, int visitedLimit, float minScore) throws IOException;
 
   /**
    * Get the {@link FieldInfos} describing all fields in this reader.

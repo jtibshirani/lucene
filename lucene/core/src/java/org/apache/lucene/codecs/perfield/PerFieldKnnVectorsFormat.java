@@ -263,13 +263,13 @@ public abstract class PerFieldKnnVectorsFormat extends KnnVectorsFormat {
     }
 
     @Override
-    public TopDocs search(String field, float[] target, int k, Bits acceptDocs, int visitedLimit)
+    public TopDocs search(String field, float[] target, int k, Bits acceptDocs, int visitedLimit, float minScore)
         throws IOException {
       KnnVectorsReader knnVectorsReader = fields.get(field);
       if (knnVectorsReader == null) {
         return new TopDocs(new TotalHits(0, TotalHits.Relation.EQUAL_TO), new ScoreDoc[0]);
       } else {
-        return knnVectorsReader.search(field, target, k, acceptDocs, visitedLimit);
+        return knnVectorsReader.search(field, target, k, acceptDocs, visitedLimit, minScore);
       }
     }
 

@@ -219,7 +219,7 @@ public final class Lucene91HnswVectorsReader extends KnnVectorsReader {
   }
 
   @Override
-  public TopDocs search(String field, float[] target, int k, Bits acceptDocs, int visitedLimit)
+  public TopDocs search(String field, float[] target, int k, Bits acceptDocs, int visitedLimit, float minScore)
       throws IOException {
     FieldEntry fieldEntry = fields.get(field);
 
@@ -231,6 +231,7 @@ public final class Lucene91HnswVectorsReader extends KnnVectorsReader {
     k = Math.min(k, fieldEntry.size());
     OffHeapVectorValues vectorValues = getOffHeapVectorValues(fieldEntry);
 
+    float minSimilarity = minScore * 2 - 1;
     NeighborQueue results =
         HnswGraphSearcher.search(
             target,
@@ -239,7 +240,8 @@ public final class Lucene91HnswVectorsReader extends KnnVectorsReader {
             fieldEntry.similarityFunction,
             getGraph(fieldEntry),
             getAcceptOrds(acceptDocs, fieldEntry),
-            visitedLimit);
+            visitedLimit,
+            minSimilarity);
 
     int i = 0;
     ScoreDoc[] scoreDocs = new ScoreDoc[Math.min(results.size(), k)];
