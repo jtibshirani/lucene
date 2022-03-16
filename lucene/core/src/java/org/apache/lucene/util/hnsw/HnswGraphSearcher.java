@@ -63,7 +63,7 @@ public final class HnswGraphSearcher {
       Bits acceptOrds,
       int visitedLimit)
       throws IOException {
-    return search(query, topK, vectors, similarityFunction, graph, acceptOrds, visitedLimit, -1.0f);
+    return search(query, topK, vectors, similarityFunction, graph, acceptOrds, visitedLimit, -2.0f);
   }
 
   /**
@@ -99,7 +99,7 @@ public final class HnswGraphSearcher {
     int[] eps = new int[] {graph.entryNode()};
     int numVisited = 0;
     for (int level = graph.numLevels() - 1; level >= 1; level--) {
-      results = graphSearcher.searchLevel(query, 1, level, eps, vectors, graph, null, visitedLimit, 0.0f);
+      results = graphSearcher.searchLevel(query, 1, level, eps, vectors, graph, null, visitedLimit, -2.0f);
       eps[0] = results.pop();
 
       numVisited += results.visitedCount();
