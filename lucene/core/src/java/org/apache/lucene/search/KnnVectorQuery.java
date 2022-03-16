@@ -106,6 +106,7 @@ public class KnnVectorQuery extends Query {
 
     float minScore = 0.0f;
     int numResults = 0;
+    TopDocs topK = null;
     for (LeafReaderContext ctx : reader.leaves()) {
       TopDocs results = searchLeaf(ctx, filterCollector, minScore);
       if (ctx.docBase > 0) {
@@ -113,16 +114,19 @@ public class KnnVectorQuery extends Query {
           scoreDoc.doc += ctx.docBase;
         }
       }
-      perLeafResults[ctx.ord] = results;
 
-      numResults += results.scoreDocs.length;
-      if (numResults >= k && results.scoreDocs.length > 0) {
-        minScore = Math.max(minScore, results.scoreDocs[results.scoreDocs.length - 1].score);
+      if (topK == null) {
+        topK = results;
+      } else {
+        topK = TopDocs.merge(k, new TopDocs[]{topK, results});
+      }
+
+      if (topK.scoreDocs.length == k) {
+        minScore = Math.max(minScore, results.scoreDocs[k - 1].score);
       }
     }
     // Merge sort the results
-    TopDocs topK = TopDocs.merge(k, perLeafResults);
-    if (topK.scoreDocs.length == 0) {
+    if (topK == null || topK.scoreDocs.length == 0) {
       return new MatchNoDocsQuery();
     }
     return createRewrittenQuery(reader, topK);

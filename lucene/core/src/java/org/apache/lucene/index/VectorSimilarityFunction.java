@@ -33,6 +33,11 @@ public enum VectorSimilarityFunction {
     }
 
     @Override
+    public float compare(float[] v1, float[] v2, float minSimilarity) {
+      return compare(v1, v2);
+    }
+
+    @Override
     public float convertToScore(float similarity) {
       return 1 / (1 + similarity);
     }
@@ -51,7 +56,19 @@ public enum VectorSimilarityFunction {
     }
 
     @Override
+    public float compare(float[] v1, float[] v2, float minSimilarity) {
+      float result = compare(v1, v2);
+      if (result <= minSimilarity) {
+        result -= 100;
+      }
+      return result;
+    }
+
+    @Override
     public float convertToScore(float similarity) {
+      if (similarity < -1) {
+        similarity += 100;
+      }
       return (1 + similarity) / 2;
     }
   },
@@ -69,7 +86,19 @@ public enum VectorSimilarityFunction {
     }
 
     @Override
+    public float compare(float[] v1, float[] v2, float minSimilarity) {
+        float result = compare(v1, v2);
+        if (result <= minSimilarity) {
+           result -= 100;
+        }
+        return result;
+    }
+
+    @Override
     public float convertToScore(float similarity) {
+      if (similarity < -1) {
+        similarity += 100;
+      }
       return (1 + similarity) / 2;
     }
   };
@@ -97,6 +126,15 @@ public enum VectorSimilarityFunction {
    * @return the value of the similarity function applied to the two vectors
    */
   public abstract float compare(float[] v1, float[] v2);
+
+  /**
+   * Calculates a similarity score between the two vectors with a specified function.
+   *
+   * @param v1 a vector
+   * @param v2 another vector, of the same dimension
+   * @return the value of the similarity function applied to the two vectors
+   */
+  public abstract float compare(float[] v1, float[] v2, float minSimilarity);
 
   /**
    * Converts similarity scores used (may be negative, reversed, etc) into document scores, which

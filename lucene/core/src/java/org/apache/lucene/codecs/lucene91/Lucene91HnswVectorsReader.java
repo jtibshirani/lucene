@@ -231,7 +231,7 @@ public final class Lucene91HnswVectorsReader extends KnnVectorsReader {
     k = Math.min(k, fieldEntry.size());
     OffHeapVectorValues vectorValues = getOffHeapVectorValues(fieldEntry);
 
-    float minSimilarity = minScore * 2 - 1;
+    float minSimilarity = minScore * 2.0f - 1.0f;
     NeighborQueue results =
         HnswGraphSearcher.search(
             target,

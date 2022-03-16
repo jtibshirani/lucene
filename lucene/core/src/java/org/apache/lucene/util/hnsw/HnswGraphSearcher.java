@@ -158,11 +158,11 @@ public final class HnswGraphSearcher {
           results.markIncomplete();
           break;
         }
-        float score = similarityFunction.compare(query, vectors.vectorValue(ep));
+        float similarity = similarityFunction.compare(query, vectors.vectorValue(ep), minSimilarity);
         numVisited++;
-        candidates.add(ep, score);
+        candidates.add(ep, similarity);
         if (acceptOrds == null || acceptOrds.get(ep)) {
-          results.add(ep, score);
+          results.add(ep, similarity);
         }
       }
     }
@@ -170,7 +170,6 @@ public final class HnswGraphSearcher {
     // A bound that holds the minimum similarity to the query vector that a candidate vector must
     // have to be considered.
     BoundsChecker bound = BoundsChecker.create(similarityFunction.reversed);
-    bound.set(minSimilarity);
     if (results.size() >= topK) {
       bound.update(results.topScore());
     }
@@ -194,7 +193,7 @@ public final class HnswGraphSearcher {
           results.markIncomplete();
           break;
         }
-        float score = similarityFunction.compare(query, vectors.vectorValue(friendOrd));
+        float score = similarityFunction.compare(query, vectors.vectorValue(friendOrd), minSimilarity);
         numVisited++;
         if (bound.check(score) == false) {
           candidates.add(friendOrd, score);
