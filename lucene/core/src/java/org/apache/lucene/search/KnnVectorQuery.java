@@ -53,7 +53,12 @@ public class KnnVectorQuery extends Query {
   private final String field;
   private final float[] target;
   private final int k;
+  private final int numCands;
   private final Query filter;
+
+  public KnnVectorQuery(String field, float[] target, int k) {
+    this(field, target, k, k, null);
+  }
 
   /**
    * Find the <code>k</code> nearest documents to the target vector according to the vectors in the
@@ -64,8 +69,12 @@ public class KnnVectorQuery extends Query {
    * @param k the number of documents to find
    * @throws IllegalArgumentException if <code>k</code> is less than 1
    */
-  public KnnVectorQuery(String field, float[] target, int k) {
-    this(field, target, k, null);
+  public KnnVectorQuery(String field, float[] target, int k, int numCands) {
+    this(field, target, k, numCands, null);
+  }
+
+  public KnnVectorQuery(String field, float[] target, int k, Query filter) {
+    this(field, target, k, k, filter);
   }
 
   /**
@@ -78,13 +87,14 @@ public class KnnVectorQuery extends Query {
    * @param filter a filter applied before the vector search
    * @throws IllegalArgumentException if <code>k</code> is less than 1
    */
-  public KnnVectorQuery(String field, float[] target, int k, Query filter) {
+  public KnnVectorQuery(String field, float[] target, int k, int numCands, Query filter) {
     this.field = field;
     this.target = target;
     this.k = k;
     if (k < 1) {
       throw new IllegalArgumentException("k must be at least 1, got: " + k);
     }
+    this.numCands = numCands;
     this.filter = filter;
   }
 
@@ -121,11 +131,11 @@ public class KnnVectorQuery extends Query {
         topK = TopDocs.merge(k, new TopDocs[]{topK, results});
       }
 
-      if (topK.scoreDocs.length == k) {
-        minScore = Math.max(minScore, results.scoreDocs[k - 1].score);
+      if (topK.scoreDocs.length >= k) {
+        minScore = Math.max(minScore, topK.scoreDocs[k - 1].score);
       }
     }
-    // Merge sort the results
+
     if (topK == null || topK.scoreDocs.length == 0) {
       return new MatchNoDocsQuery();
     }
@@ -167,7 +177,7 @@ public class KnnVectorQuery extends Query {
   private TopDocs approximateSearch(LeafReaderContext context, Bits acceptDocs, int visitedLimit, float minScore)
       throws IOException {
     TopDocs results =
-        context.reader().searchNearestVectors(field, target, k, acceptDocs, visitedLimit, minScore);
+        context.reader().searchNearestVectors(field, target, numCands, acceptDocs, visitedLimit, minScore);
     return results != null ? results : NO_RESULTS;
   }
 
@@ -183,7 +193,7 @@ public class KnnVectorQuery extends Query {
     VectorSimilarityFunction similarityFunction = fi.getVectorSimilarityFunction();
     VectorValues vectorValues = context.reader().getVectorValues(field);
 
-    HitQueue queue = new HitQueue(k, true);
+    HitQueue queue = new HitQueue(numCands, true);
     ScoreDoc topDoc = queue.top();
     int doc;
     while ((doc = acceptIterator.nextDoc()) != DocIdSetIterator.NO_MORE_DOCS) {

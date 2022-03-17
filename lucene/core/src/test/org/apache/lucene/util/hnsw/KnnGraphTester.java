@@ -436,7 +436,7 @@ public class KnnGraphTester {
   private static TopDocs doKnnSearch(
       IndexReader reader, String field, float[] vector, int k, int fanout) throws IOException {
     IndexSearcher indexSearcher = new IndexSearcher(reader);
-    Query query = new KnnVectorQuery(field, vector, k + fanout);
+    Query query = new KnnVectorQuery(field, vector, k, k + fanout);
     return indexSearcher.search(query, k);
   }
 
