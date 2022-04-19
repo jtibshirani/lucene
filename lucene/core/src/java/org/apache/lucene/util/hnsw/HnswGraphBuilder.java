@@ -18,6 +18,7 @@
 package org.apache.lucene.util.hnsw;
 
 import static java.lang.Math.log;
+import static java.lang.Math.max;
 
 import java.io.IOException;
 import java.util.Locale;
@@ -187,10 +188,11 @@ public final class HnswGraphBuilder {
      * is closer to target than it is to any of the already-selected neighbors (ie selected in this method,
      * since the node is new and has no prior neighbors).
      */
+    int maxConnForLevel = level == 0 ? 2 * maxConn : maxConn;
     NeighborArray neighbors = hnsw.getNeighbors(level, node);
     assert neighbors.size() == 0; // new node
     popToScratch(candidates);
-    selectDiverse(neighbors, scratch);
+    selectDiverse(neighbors, scratch, maxConnForLevel);
 
     // Link the selected nodes to the new node, and the new node to the selected nodes (again
     // applying diversity heuristic)
@@ -199,15 +201,15 @@ public final class HnswGraphBuilder {
       int nbr = neighbors.node[i];
       NeighborArray nbrNbr = hnsw.getNeighbors(level, nbr);
       nbrNbr.add(node, neighbors.score[i]);
-      if (nbrNbr.size() > maxConn) {
+      if (nbrNbr.size() > maxConnForLevel) {
         diversityUpdate(nbrNbr);
       }
     }
   }
 
-  private void selectDiverse(NeighborArray neighbors, NeighborArray candidates) throws IOException {
+  private void selectDiverse(NeighborArray neighbors, NeighborArray candidates, int maxConnForLevel) throws IOException {
     // Select the best maxConn neighbors of the new node, applying the diversity heuristic
-    for (int i = candidates.size() - 1; neighbors.size() < maxConn && i >= 0; i--) {
+    for (int i = candidates.size() - 1; neighbors.size() < maxConnForLevel && i >= 0; i--) {
       // compare each neighbor (in distance order) against the closer neighbors selected so far,
       // only adding it if it is closer to the target than to any of the other selected neighbors
       int cNode = candidates.node[i];
@@ -257,12 +259,12 @@ public final class HnswGraphBuilder {
   }
 
   private void diversityUpdate(NeighborArray neighbors) throws IOException {
-    assert neighbors.size() == maxConn + 1;
+    int lastIndex = neighbors.size() - 1;
     int replacePoint = findNonDiverse(neighbors);
     if (replacePoint == -1) {
       // none found; check score against worst existing neighbor
       bound.set(neighbors.score[0]);
-      if (bound.check(neighbors.score[maxConn])) {
+      if (bound.check(neighbors.score[lastIndex])) {
         // drop the new neighbor; it is not competitive and there were no diversity failures
         neighbors.removeLast();
         return;
@@ -270,8 +272,8 @@ public final class HnswGraphBuilder {
         replacePoint = 0;
       }
     }
-    neighbors.node[replacePoint] = neighbors.node[maxConn];
-    neighbors.score[replacePoint] = neighbors.score[maxConn];
+    neighbors.node[replacePoint] = neighbors.node[lastIndex];
+    neighbors.score[replacePoint] = neighbors.score[lastIndex];
     neighbors.removeLast();
   }
 
@@ -283,12 +285,12 @@ public final class HnswGraphBuilder {
       int nbrNode = neighbors.node[i];
       bound.set(neighbors.score[i]);
       float[] nbrVector = vectorValues.vectorValue(nbrNode);
-      for (int j = maxConn; j > i; j--) {
+      for (int j = neighbors.size() - 1; j > i; j--) {
         float diversityCheck =
             similarityFunction.compare(nbrVector, buildVectors.vectorValue(neighbors.node[j]));
         if (bound.check(diversityCheck) == false) {
           // node j is too similar to node i given its score relative to the base node
-          // replace it with the new node, which is at [maxConn]
+          // replace it with the new node, which is at the last index
           return i;
         }
       }

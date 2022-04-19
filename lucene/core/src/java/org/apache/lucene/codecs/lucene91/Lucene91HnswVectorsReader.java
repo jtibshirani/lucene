@@ -379,8 +379,9 @@ public final class Lucene91HnswVectorsReader extends KnnVectorsReader {
           graphOffsetsByLevel[level] = 0;
         } else {
           int numNodesOnPrevLevel = level == 1 ? size : nodesByLevel[level - 1].length;
+          long maxConnForLevel = level == 1 ? 2L * maxConn : maxConn;
           graphOffsetsByLevel[level] =
-              graphOffsetsByLevel[level - 1] + (1 + maxConn) * Integer.BYTES * numNodesOnPrevLevel;
+              graphOffsetsByLevel[level - 1] + (1 + maxConnForLevel) * Integer.BYTES * numNodesOnPrevLevel;
         }
       }
     }
@@ -522,6 +523,7 @@ public final class Lucene91HnswVectorsReader extends KnnVectorsReader {
     final int entryNode;
     final int size;
     final long bytesForConns;
+    final long bytesForConnsLevel0;
 
     int arcCount;
     int arcUpTo;
@@ -535,6 +537,7 @@ public final class Lucene91HnswVectorsReader extends KnnVectorsReader {
       this.size = entry.size();
       this.graphOffsetsByLevel = entry.graphOffsetsByLevel;
       this.bytesForConns = ((long) entry.maxConn + 1) * Integer.BYTES;
+      this.bytesForConnsLevel0 = (2L * entry.maxConn + 1) * Integer.BYTES;
     }
 
     @Override
@@ -544,7 +547,8 @@ public final class Lucene91HnswVectorsReader extends KnnVectorsReader {
               ? targetOrd
               : Arrays.binarySearch(nodesByLevel[level], 0, nodesByLevel[level].length, targetOrd);
       assert targetIndex >= 0;
-      long graphDataOffset = graphOffsetsByLevel[level] + targetIndex * bytesForConns;
+      long bytesForConnsPerLevel = level == 0 ? bytesForConnsLevel0 : bytesForConns;
+      long graphDataOffset = graphOffsetsByLevel[level] + targetIndex * bytesForConnsPerLevel;
       // unsafe; no bounds checking
       dataIn.seek(graphDataOffset);
       arcCount = dataIn.readInt();

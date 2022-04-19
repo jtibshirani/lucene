@@ -398,7 +398,7 @@ public class TestHnswGraph extends LuceneTestCase {
     assertLevel0Neighbors(builder.hnsw, 0, 1, 2);
     // 4 is closer to 1 than either existing neighbor (0, 3). 3 fails diversity check with 4, so
     // replace it
-    assertLevel0Neighbors(builder.hnsw, 1, 0, 4);
+    assertLevel0Neighbors(builder.hnsw, 1, 0, 3, 4);
     assertLevel0Neighbors(builder.hnsw, 2, 0);
     // 1 survives the diversity check
     assertLevel0Neighbors(builder.hnsw, 3, 1, 4);
@@ -406,11 +406,11 @@ public class TestHnswGraph extends LuceneTestCase {
 
     builder.addGraphNode(5, vectors.vectorValue(5));
     assertLevel0Neighbors(builder.hnsw, 0, 1, 2);
-    assertLevel0Neighbors(builder.hnsw, 1, 0, 5);
+    assertLevel0Neighbors(builder.hnsw, 1, 0, 3, 4, 5);
     assertLevel0Neighbors(builder.hnsw, 2, 0);
     // even though 5 is closer, 3 is not a neighbor of 5, so no update to *its* neighbors occurs
     assertLevel0Neighbors(builder.hnsw, 3, 1, 4);
-    assertLevel0Neighbors(builder.hnsw, 4, 3, 5);
+    assertLevel0Neighbors(builder.hnsw, 4, 1, 3, 5);
     assertLevel0Neighbors(builder.hnsw, 5, 1, 4);
   }
 
