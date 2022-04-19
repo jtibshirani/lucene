@@ -18,6 +18,7 @@
 package org.apache.lucene.util.hnsw;
 
 import static java.lang.Math.log;
+import static java.lang.Math.max;
 
 import java.io.IOException;
 import java.util.Locale;
@@ -183,10 +184,11 @@ public final class HnswGraphBuilder {
      * is closer to target than it is to any of the already-selected neighbors (ie selected in this method,
      * since the node is new and has no prior neighbors).
      */
+    int maxConnForLevel = level == 0 ? 2 * maxConn : maxConn;
     NeighborArray neighbors = hnsw.getNeighbors(level, node);
     assert neighbors.size() == 0; // new node
     popToScratch(candidates);
-    selectAndLinkDiverse(neighbors, scratch);
+    selectAndLinkDiverse(neighbors, scratch, maxConnForLevel);
 
     // Link the selected nodes to the new node, and the new node to the selected nodes (again
     // applying diversity heuristic)
@@ -195,17 +197,17 @@ public final class HnswGraphBuilder {
       int nbr = neighbors.node[i];
       NeighborArray nbrNbr = hnsw.getNeighbors(level, nbr);
       nbrNbr.insertSorted(node, neighbors.score[i]);
-      if (nbrNbr.size() > maxConn) {
+      if (nbrNbr.size() > maxConnForLevel) {
         int indexToRemove = findWorstNonDiverse(nbrNbr);
         nbrNbr.removeIndex(indexToRemove);
       }
     }
   }
 
-  private void selectAndLinkDiverse(NeighborArray neighbors, NeighborArray candidates)
+  private void selectAndLinkDiverse(NeighborArray neighbors, NeighborArray candidates, int maxConnForLevel)
       throws IOException {
     // Select the best maxConn neighbors of the new node, applying the diversity heuristic
-    for (int i = candidates.size() - 1; neighbors.size() < maxConn && i >= 0; i--) {
+    for (int i = candidates.size() - 1; neighbors.size() < maxConnForLevel && i >= 0; i--) {
       // compare each neighbor (in distance order) against the closer neighbors selected so far,
       // only adding it if it is closer to the target than to any of the other selected neighbors
       int cNode = candidates.node[i];

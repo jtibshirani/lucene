@@ -266,7 +266,8 @@ public final class Lucene91HnswVectorsWriter extends KnnVectorsWriter {
         }
         // if number of connections < maxConn, add bogus values up to maxConn to have predictable
         // offsets
-        for (int i = size; i < maxConn; i++) {
+        int maxConnPerLevel = level == 0 ? 2 * maxConn : maxConn;
+        for (int i = size; i < maxConnPerLevel; i++) {
           vectorIndex.writeInt(0);
         }
       }
