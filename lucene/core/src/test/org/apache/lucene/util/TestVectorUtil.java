@@ -138,7 +138,7 @@ public class TestVectorUtil extends LuceneTestCase {
     float[] v = new float[dim];
     Random random = random();
     for (int i = 0; i < dim; i++) {
-      v[i] = random.nextFloat();
+      v[i] = random.nextFloat() * 127;
     }
     return v;
   }

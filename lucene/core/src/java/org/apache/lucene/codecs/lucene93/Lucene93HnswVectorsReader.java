@@ -29,6 +29,7 @@ import org.apache.lucene.index.CorruptIndexException;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.FieldInfos;
 import org.apache.lucene.index.IndexFileNames;
+import org.apache.lucene.index.RandomAccessVectorValues;
 import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.index.VectorValues;
@@ -169,7 +170,7 @@ public final class Lucene93HnswVectorsReader extends KnnVectorsReader {
               + fieldEntry.dimension);
     }
 
-    long numBytes = (long) fieldEntry.size() * dimension * Float.BYTES;
+    long numBytes = (long) fieldEntry.size() * dimension * fieldEntry.elementSize();
     if (numBytes != fieldEntry.vectorDataLength) {
       throw new IllegalStateException(
           "Vector data length "
@@ -193,9 +194,19 @@ public final class Lucene93HnswVectorsReader extends KnnVectorsReader {
     return VectorSimilarityFunction.values()[similarityFunctionId];
   }
 
+  private boolean readReducePrecision(DataInput input) throws IOException {
+    byte reducePrecisionValue = input.readByte();
+    if (reducePrecisionValue > 1) {
+      throw new CorruptIndexException(
+          "Invalid reduce precision value: " + reducePrecisionValue, input);
+    }
+    return reducePrecisionValue == 1;
+  }
+
   private FieldEntry readField(IndexInput input) throws IOException {
     VectorSimilarityFunction similarityFunction = readSimilarityFunction(input);
-    return new FieldEntry(input, similarityFunction);
+    boolean reducePrecision = readReducePrecision(input);
+    return new FieldEntry(input, similarityFunction, reducePrecision);
   }
 
   @Override
@@ -286,6 +297,7 @@ public final class Lucene93HnswVectorsReader extends KnnVectorsReader {
   static class FieldEntry {
 
     final VectorSimilarityFunction similarityFunction;
+    final boolean reducePrecision;
     final long vectorDataOffset;
     final long vectorDataLength;
     final long vectorIndexOffset;
@@ -315,8 +327,10 @@ public final class Lucene93HnswVectorsReader extends KnnVectorsReader {
     final DirectMonotonicReader.Meta meta;
     final long addressesLength;
 
-    FieldEntry(IndexInput input, VectorSimilarityFunction similarityFunction) throws IOException {
+    FieldEntry(IndexInput input, VectorSimilarityFunction similarityFunction, boolean reducePrecision)
+        throws IOException {
       this.similarityFunction = similarityFunction;
+      this.reducePrecision = reducePrecision;
       vectorDataOffset = input.readVLong();
       vectorDataLength = input.readVLong();
       vectorIndexOffset = input.readVLong();
@@ -380,6 +394,10 @@ public final class Lucene93HnswVectorsReader extends KnnVectorsReader {
 
     int size() {
       return size;
+    }
+
+    int elementSize() {
+      return reducePrecision ? 1 : Float.BYTES;
     }
   }
 

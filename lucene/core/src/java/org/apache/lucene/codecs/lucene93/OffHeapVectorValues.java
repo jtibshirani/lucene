@@ -35,17 +35,19 @@ abstract class OffHeapVectorValues extends VectorValues
 
   protected final int dimension;
   protected final int size;
+  protected final int elementSize;
   protected final IndexInput slice;
   protected final BytesRef binaryValue;
   protected final ByteBuffer byteBuffer;
   protected final int byteSize;
   protected final float[] value;
 
-  OffHeapVectorValues(int dimension, int size, IndexInput slice) {
+  OffHeapVectorValues(int dimension, int size, int elementSize, IndexInput slice) {
     this.dimension = dimension;
     this.size = size;
+    this.elementSize = elementSize;
     this.slice = slice;
-    byteSize = Float.BYTES * dimension;
+    byteSize = elementSize * dimension;
     byteBuffer = ByteBuffer.allocate(byteSize);
     value = new float[dimension];
     binaryValue = new BytesRef(byteBuffer.array(), byteBuffer.arrayOffset(), byteSize);
@@ -86,6 +88,11 @@ abstract class OffHeapVectorValues extends VectorValues
 
   public abstract int ordToDoc(int ord);
 
+  abstract Bits getAcceptOrds(Bits acceptDocs);
+
+  @Override
+  public abstract OffHeapVectorValues randomAccess() throws IOException;
+
   static OffHeapVectorValues load(
       Lucene93HnswVectorsReader.FieldEntry fieldEntry, IndexInput vectorData) throws IOException {
     if (fieldEntry.docsWithFieldOffset == -2) {
@@ -93,21 +100,17 @@ abstract class OffHeapVectorValues extends VectorValues
     }
     IndexInput bytesSlice =
         vectorData.slice("vector-data", fieldEntry.vectorDataOffset, fieldEntry.vectorDataLength);
-    if (fieldEntry.docsWithFieldOffset == -1) {
-      return new DenseOffHeapVectorValues(fieldEntry.dimension, fieldEntry.size, bytesSlice);
-    } else {
-      return new SparseOffHeapVectorValues(fieldEntry, vectorData, bytesSlice);
-    }
+    OffHeapVectorValues vectorValues = fieldEntry.docsWithFieldOffset == -1
+        ? new DenseOffHeapVectorValues(fieldEntry.dimension, fieldEntry.size, fieldEntry.elementSize(), bytesSlice)
+        : new SparseOffHeapVectorValues(fieldEntry, vectorData, bytesSlice);
+    return new ExpandingOffHeapVectorValues(vectorValues);
   }
-
-  abstract Bits getAcceptOrds(Bits acceptDocs);
-
   static class DenseOffHeapVectorValues extends OffHeapVectorValues {
 
     private int doc = -1;
 
-    public DenseOffHeapVectorValues(int dimension, int size, IndexInput slice) {
-      super(dimension, size, slice);
+    public DenseOffHeapVectorValues(int dimension, int size, int elementSize, IndexInput slice) {
+      super(dimension, size, elementSize, slice);
     }
 
     @Override
@@ -144,11 +147,6 @@ abstract class OffHeapVectorValues extends VectorValues
     }
 
     @Override
-    public RandomAccessVectorValues randomAccess() throws IOException {
-      return new DenseOffHeapVectorValues(dimension, size, slice.clone());
-    }
-
-    @Override
     public int ordToDoc(int ord) {
       return ord;
     }
@@ -156,6 +154,11 @@ abstract class OffHeapVectorValues extends VectorValues
     @Override
     Bits getAcceptOrds(Bits acceptDocs) {
       return acceptDocs;
+    }
+
+    @Override
+    public OffHeapVectorValues randomAccess() throws IOException {
+      return new DenseOffHeapVectorValues(dimension, size, elementSize, slice.clone());
     }
   }
 
@@ -170,7 +173,7 @@ abstract class OffHeapVectorValues extends VectorValues
         Lucene93HnswVectorsReader.FieldEntry fieldEntry, IndexInput dataIn, IndexInput slice)
         throws IOException {
 
-      super(fieldEntry.dimension, fieldEntry.size, slice);
+      super(fieldEntry.dimension, fieldEntry.size, fieldEntry.elementSize(), slice);
       this.fieldEntry = fieldEntry;
       final RandomAccessInput addressesData =
           dataIn.randomAccessSlice(fieldEntry.addressesOffset, fieldEntry.addressesLength);
@@ -217,11 +220,6 @@ abstract class OffHeapVectorValues extends VectorValues
     }
 
     @Override
-    public RandomAccessVectorValues randomAccess() throws IOException {
-      return new SparseOffHeapVectorValues(fieldEntry, dataIn, slice.clone());
-    }
-
-    @Override
     public int ordToDoc(int ord) {
       return (int) ordToDoc.get(ord);
     }
@@ -243,12 +241,17 @@ abstract class OffHeapVectorValues extends VectorValues
         }
       };
     }
+
+    @Override
+    public OffHeapVectorValues randomAccess() throws IOException {
+      return new SparseOffHeapVectorValues(fieldEntry, dataIn, slice.clone());
+    }
   }
 
   private static class EmptyOffHeapVectorValues extends OffHeapVectorValues {
 
     public EmptyOffHeapVectorValues(int dimension) {
-      super(dimension, 0, null);
+      super(dimension, 0, 1, null);
     }
 
     private int doc = -1;
@@ -294,11 +297,6 @@ abstract class OffHeapVectorValues extends VectorValues
     }
 
     @Override
-    public RandomAccessVectorValues randomAccess() throws IOException {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
     public float[] vectorValue(int targetOrd) throws IOException {
       throw new UnsupportedOperationException();
     }
@@ -316,6 +314,11 @@ abstract class OffHeapVectorValues extends VectorValues
     @Override
     Bits getAcceptOrds(Bits acceptDocs) {
       return null;
+    }
+
+    @Override
+    public OffHeapVectorValues randomAccess() throws IOException {
+      throw new UnsupportedOperationException();
     }
   }
 }

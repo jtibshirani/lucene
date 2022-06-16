@@ -114,6 +114,8 @@ public final class Lucene93HnswVectorsFormat extends KnnVectorsFormat {
    */
   public static final int DEFAULT_BEAM_WIDTH = 100;
 
+  private static final boolean DEFAULT_REDUCE_PRECISION = true;
+
   static final int DIRECT_MONOTONIC_BLOCK_SHIFT = 16;
 
   /**
@@ -128,10 +130,11 @@ public final class Lucene93HnswVectorsFormat extends KnnVectorsFormat {
    * HnswGraph} for details.
    */
   private final int beamWidth;
+  private final boolean reducePrecision;
 
   /** Constructs a format using default graph construction parameters */
   public Lucene93HnswVectorsFormat() {
-    this(DEFAULT_MAX_CONN, DEFAULT_BEAM_WIDTH);
+    this(DEFAULT_MAX_CONN, DEFAULT_BEAM_WIDTH, DEFAULT_REDUCE_PRECISION);
   }
 
   /**
@@ -141,14 +144,25 @@ public final class Lucene93HnswVectorsFormat extends KnnVectorsFormat {
    * @param beamWidth the size of the queue maintained during graph construction.
    */
   public Lucene93HnswVectorsFormat(int maxConn, int beamWidth) {
-    super("lucene93HnswVectorsFormat");
+    this(maxConn, beamWidth, DEFAULT_REDUCE_PRECISION);
+  }
+
+  /**
+   * Constructs a format using the given graph construction parameters.
+   *
+   * @param maxConn the maximum number of connections to a node in the HNSW graph
+   * @param beamWidth the size of the queue maintained during graph construction.
+   */
+  public Lucene93HnswVectorsFormat(int maxConn, int beamWidth, boolean reducePrecision) {
+    super("Lucene93HnswVectorsFormat");
     this.maxConn = maxConn;
     this.beamWidth = beamWidth;
+    this.reducePrecision = reducePrecision;
   }
 
   @Override
   public KnnVectorsWriter fieldsWriter(SegmentWriteState state) throws IOException {
-    return new Lucene93HnswVectorsWriter(state, maxConn, beamWidth);
+    return new Lucene93HnswVectorsWriter(state, maxConn, beamWidth, reducePrecision);
   }
 
   @Override

@@ -29,6 +29,7 @@ import org.apache.lucene.codecs.lucene90.IndexedDISI;
 import org.apache.lucene.index.DocsWithFieldSet;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.IndexFileNames;
+import org.apache.lucene.index.RandomAccessVectorValues;
 import org.apache.lucene.index.RandomAccessVectorValuesProducer;
 import org.apache.lucene.index.SegmentWriteState;
 import org.apache.lucene.index.VectorSimilarityFunction;
@@ -57,11 +58,13 @@ public final class Lucene93HnswVectorsWriter extends KnnVectorsWriter {
 
   private final int M;
   private final int beamWidth;
+  private final boolean reducePrecision;
   private boolean finished;
 
-  Lucene93HnswVectorsWriter(SegmentWriteState state, int M, int beamWidth) throws IOException {
+  Lucene93HnswVectorsWriter(SegmentWriteState state, int M, int beamWidth, boolean reducePrecision) throws IOException {
     this.M = M;
     this.beamWidth = beamWidth;
+    this.reducePrecision = reducePrecision;
 
     assert state.fieldInfos.hasVectorValues();
     segmentWriteState = state;
@@ -120,6 +123,9 @@ public final class Lucene93HnswVectorsWriter extends KnnVectorsWriter {
       throws IOException {
     long vectorDataOffset = vectorData.alignFilePointer(Float.BYTES);
     VectorValues vectors = knnVectorsReader.getVectorValues(fieldInfo.name);
+    if (reducePrecision) {
+      vectors = new CompressingVectorValues(vectors);
+    }
 
     IndexOutput tempVectorData =
         segmentWriteState.directory.createTempOutput(
@@ -145,9 +151,13 @@ public final class Lucene93HnswVectorsWriter extends KnnVectorsWriter {
       // we use Lucene93HnswVectorsReader.DenseOffHeapVectorValues for the graph construction
       // doesn't need to know docIds
       // TODO: separate random access vector values from DocIdSetIterator?
+      int elementSize = reducePrecision ? 1 : Float.BYTES;
       OffHeapVectorValues offHeapVectors =
           new OffHeapVectorValues.DenseOffHeapVectorValues(
-              vectors.dimension(), docsWithField.cardinality(), vectorDataInput);
+              vectors.dimension(), docsWithField.cardinality(), elementSize, vectorDataInput);
+      if (reducePrecision) {
+        offHeapVectors = new ExpandingOffHeapVectorValues(offHeapVectors);
+      }
       OnHeapHnswGraph graph =
           offHeapVectors.size() == 0
               ? null
@@ -183,7 +193,7 @@ public final class Lucene93HnswVectorsWriter extends KnnVectorsWriter {
     for (int docV = vectors.nextDoc(); docV != NO_MORE_DOCS; docV = vectors.nextDoc()) {
       // write vector
       BytesRef binaryValue = vectors.binaryValue();
-      assert binaryValue.length == vectors.dimension() * Float.BYTES;
+//      assert binaryValue.length == vectors.dimension() * Float.BYTES;
       output.writeBytes(binaryValue.bytes, binaryValue.offset, binaryValue.length);
       docsWithField.add(docV);
     }
@@ -201,6 +211,7 @@ public final class Lucene93HnswVectorsWriter extends KnnVectorsWriter {
       throws IOException {
     meta.writeInt(field.number);
     meta.writeInt(field.getVectorSimilarityFunction().ordinal());
+    meta.writeByte((byte) (reducePrecision ? 1 : 0));
     meta.writeVLong(vectorDataOffset);
     meta.writeVLong(vectorDataLength);
     meta.writeVLong(vectorIndexOffset);
