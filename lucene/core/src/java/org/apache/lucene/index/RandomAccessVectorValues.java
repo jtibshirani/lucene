@@ -49,4 +49,12 @@ public interface RandomAccessVectorValues {
    * @param targetOrd a valid ordinal, &ge; 0 and &lt; {@link #size()}.
    */
   BytesRef binaryValue(int targetOrd) throws IOException;
+
+  /**
+   * Compute the similarity score between the provided vector and the vector value for the given
+   * ordinal. A higher score means that the document vector is more similar to the target vector.
+   *
+   * @return the similarity score
+   */
+  float score(float[] vector, int targetOrd) throws IOException;
 }

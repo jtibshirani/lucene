@@ -27,7 +27,6 @@ import org.apache.lucene.document.KnnVectorField;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.util.BitSet;
 import org.apache.lucene.util.BitSetIterator;
@@ -186,7 +185,6 @@ public class KnnVectorQuery extends Query {
       return NO_RESULTS;
     }
 
-    VectorSimilarityFunction similarityFunction = fi.getVectorSimilarityFunction();
     VectorValues vectorValues = context.reader().getVectorValues(field);
 
     HitQueue queue = new HitQueue(k, true);
@@ -195,9 +193,8 @@ public class KnnVectorQuery extends Query {
     while ((doc = acceptIterator.nextDoc()) != DocIdSetIterator.NO_MORE_DOCS) {
       int vectorDoc = vectorValues.advance(doc);
       assert vectorDoc == doc;
-      float[] vector = vectorValues.vectorValue();
 
-      float score = similarityFunction.compare(vector, target);
+      float score = vectorValues.score(target);
       if (score >= topDoc.score) {
         topDoc.score = score;
         topDoc.doc = doc;

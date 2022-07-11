@@ -24,6 +24,7 @@ import org.apache.lucene.codecs.KnnVectorsWriter;
 import org.apache.lucene.codecs.lucene90.IndexedDISI;
 import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.SegmentWriteState;
+import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.util.hnsw.HnswGraph;
@@ -129,26 +130,31 @@ public final class Lucene93HnswVectorsFormat extends KnnVectorsFormat {
    */
   private final int beamWidth;
 
+  private final VectorSimilarityFunction similarity;
+
   /** Constructs a format using default graph construction parameters */
   public Lucene93HnswVectorsFormat() {
-    this(DEFAULT_MAX_CONN, DEFAULT_BEAM_WIDTH);
+    this(VectorSimilarityFunction.EUCLIDEAN, DEFAULT_MAX_CONN, DEFAULT_BEAM_WIDTH);
   }
 
   /**
    * Constructs a format using the given graph construction parameters.
    *
+   * @param similarity the vector similarity function to use
    * @param maxConn the maximum number of connections to a node in the HNSW graph
    * @param beamWidth the size of the queue maintained during graph construction.
    */
-  public Lucene93HnswVectorsFormat(int maxConn, int beamWidth) {
+  public Lucene93HnswVectorsFormat(
+      VectorSimilarityFunction similarity, int maxConn, int beamWidth) {
     super("Lucene93HnswVectorsFormat");
+    this.similarity = similarity;
     this.maxConn = maxConn;
     this.beamWidth = beamWidth;
   }
 
   @Override
   public KnnVectorsWriter fieldsWriter(SegmentWriteState state) throws IOException {
-    return new Lucene93HnswVectorsWriter(state, maxConn, beamWidth);
+    return new Lucene93HnswVectorsWriter(state, similarity, maxConn, beamWidth);
   }
 
   @Override

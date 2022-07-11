@@ -18,6 +18,7 @@ package org.apache.lucene.codecs.lucene93;
 
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.KnnVectorsFormat;
+import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.tests.index.BaseKnnVectorsFormatTestCase;
 import org.apache.lucene.tests.util.TestUtil;
 
@@ -32,7 +33,7 @@ public class TestLucene93HnswVectorsFormat extends BaseKnnVectorsFormatTestCase 
         new Lucene93Codec() {
           @Override
           public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
-            return new Lucene93HnswVectorsFormat(10, 20);
+            return new Lucene93HnswVectorsFormat(VectorSimilarityFunction.EUCLIDEAN, 10, 20);
           }
         };
     String expectedString =

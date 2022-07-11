@@ -22,6 +22,7 @@ import org.apache.lucene.codecs.KnnVectorsReader;
 import org.apache.lucene.codecs.KnnVectorsWriter;
 import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.SegmentWriteState;
+import org.apache.lucene.index.VectorSimilarityFunction;
 
 /**
  * For debugging, curiosity, transparency only!! Do not use this codec in production.
@@ -33,13 +34,20 @@ import org.apache.lucene.index.SegmentWriteState;
  */
 public final class SimpleTextKnnVectorsFormat extends KnnVectorsFormat {
 
-  public SimpleTextKnnVectorsFormat() {
+  private final VectorSimilarityFunction similarityFunction;
+
+  public SimpleTextKnnVectorsFormat(VectorSimilarityFunction similarityFunction) {
     super("SimpleTextKnnVectorsFormat");
+    this.similarityFunction = similarityFunction;
+  }
+
+  public SimpleTextKnnVectorsFormat() {
+    this(VectorSimilarityFunction.EUCLIDEAN);
   }
 
   @Override
   public KnnVectorsWriter fieldsWriter(SegmentWriteState state) throws IOException {
-    return new SimpleTextKnnVectorsWriter(state);
+    return new SimpleTextKnnVectorsWriter(state, similarityFunction);
   }
 
   @Override

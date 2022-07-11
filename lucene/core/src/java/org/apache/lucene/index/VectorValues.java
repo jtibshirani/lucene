@@ -69,6 +69,14 @@ public abstract class VectorValues extends DocIdSetIterator {
   }
 
   /**
+   * Compute the similarity score between the provided vector and the vector value for current
+   * document ID. A higher score means that the document vector is more similar to the target vector.
+   *
+   * @return the similarity score
+   */
+  public abstract float score(float[] vector) throws IOException;
+
+  /**
    * Represents the lack of vector values. It is returned by providers that do not support
    * VectorValues.
    */
@@ -87,6 +95,12 @@ public abstract class VectorValues extends DocIdSetIterator {
 
         @Override
         public float[] vectorValue() {
+          throw new IllegalStateException(
+              "Attempt to get vectors from EMPTY values (which was not advanced)");
+        }
+
+        @Override
+        public float score(float[] vector) {
           throw new IllegalStateException(
               "Attempt to get vectors from EMPTY values (which was not advanced)");
         }

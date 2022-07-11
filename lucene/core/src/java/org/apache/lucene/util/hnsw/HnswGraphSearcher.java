@@ -21,7 +21,6 @@ import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
 
 import java.io.IOException;
 import org.apache.lucene.index.RandomAccessVectorValues;
-import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.util.BitSet;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.SparseFixedBitSet;
@@ -31,7 +30,6 @@ import org.apache.lucene.util.SparseFixedBitSet;
  * search algorithm, see {@link HnswGraph}.
  */
 public final class HnswGraphSearcher {
-  private final VectorSimilarityFunction similarityFunction;
   /**
    * Scratch data structures that are used in each {@link #searchLevel} call. These can be expensive
    * to allocate, so they're cleared and reused across calls.
@@ -43,13 +41,10 @@ public final class HnswGraphSearcher {
   /**
    * Creates a new graph searcher.
    *
-   * @param similarityFunction the similarity function to compare vectors
    * @param candidates max heap that will track the candidate nodes to explore
    * @param visited bit set that will track nodes that have already been visited
    */
-  public HnswGraphSearcher(
-      VectorSimilarityFunction similarityFunction, NeighborQueue candidates, BitSet visited) {
-    this.similarityFunction = similarityFunction;
+  public HnswGraphSearcher(NeighborQueue candidates, BitSet visited) {
     this.candidates = candidates;
     this.visited = visited;
   }
@@ -60,7 +55,6 @@ public final class HnswGraphSearcher {
    * @param query search query vector
    * @param topK the number of nodes to be returned
    * @param vectors the vector values
-   * @param similarityFunction the similarity function to compare vectors
    * @param graph the graph values. May represent the entire graph, or a level in a hierarchical
    *     graph.
    * @param acceptOrds {@link Bits} that represents the allowed document ordinals to match, or
@@ -72,16 +66,12 @@ public final class HnswGraphSearcher {
       float[] query,
       int topK,
       RandomAccessVectorValues vectors,
-      VectorSimilarityFunction similarityFunction,
       HnswGraph graph,
       Bits acceptOrds,
       int visitedLimit)
       throws IOException {
     HnswGraphSearcher graphSearcher =
-        new HnswGraphSearcher(
-            similarityFunction,
-            new NeighborQueue(topK, true),
-            new SparseFixedBitSet(vectors.size()));
+        new HnswGraphSearcher(new NeighborQueue(topK, true), new SparseFixedBitSet(vectors.size()));
     NeighborQueue results;
     int[] eps = new int[] {graph.entryNode()};
     int numVisited = 0;
@@ -149,7 +139,7 @@ public final class HnswGraphSearcher {
           results.markIncomplete();
           break;
         }
-        float score = similarityFunction.compare(query, vectors.vectorValue(ep));
+        float score = vectors.score(query, ep);
         numVisited++;
         candidates.add(ep, score);
         if (acceptOrds == null || acceptOrds.get(ep)) {
@@ -184,7 +174,7 @@ public final class HnswGraphSearcher {
           results.markIncomplete();
           break;
         }
-        float friendSimilarity = similarityFunction.compare(query, vectors.vectorValue(friendOrd));
+        float friendSimilarity = vectors.score(query, friendOrd);
         numVisited++;
         if (friendSimilarity >= minAcceptedSimilarity) {
           candidates.add(friendOrd, friendSimilarity);

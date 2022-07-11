@@ -440,6 +440,12 @@ public class ExitableDirectoryReader extends FilterDirectoryReader {
         return in.binaryValue();
       }
 
+      @Override
+      public float score(float[] vector) throws IOException {
+        checkAndThrow();
+        return in.score(vector);
+      }
+
       /**
        * Throws {@link ExitingReaderException} if {@link QueryTimeout#shouldExit()} returns true, or
        * if {@link Thread#interrupted()} returns true.

@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import org.apache.lucene.codecs.lucene90.IndexedDISI;
 import org.apache.lucene.index.RandomAccessVectorValues;
 import org.apache.lucene.index.RandomAccessVectorValuesProducer;
+import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.store.RandomAccessInput;
@@ -34,6 +35,7 @@ abstract class OffHeapVectorValues extends VectorValues
     implements RandomAccessVectorValues, RandomAccessVectorValuesProducer {
 
   protected final int dimension;
+  protected final VectorSimilarityFunction similarity;
   protected final int size;
   protected final IndexInput slice;
   protected final BytesRef binaryValue;
@@ -41,8 +43,10 @@ abstract class OffHeapVectorValues extends VectorValues
   protected final int byteSize;
   protected final float[] value;
 
-  OffHeapVectorValues(int dimension, int size, IndexInput slice) {
+  OffHeapVectorValues(
+      int dimension, VectorSimilarityFunction similarity, int size, IndexInput slice) {
     this.dimension = dimension;
+    this.similarity = similarity;
     this.size = size;
     this.slice = slice;
     byteSize = Float.BYTES * dimension;
@@ -67,6 +71,11 @@ abstract class OffHeapVectorValues extends VectorValues
   }
 
   @Override
+  public float score(float[] vector) throws IOException {
+    return similarity.compare(vector, vectorValue());
+  }
+
+  @Override
   public float[] vectorValue(int targetOrd) throws IOException {
     slice.seek((long) targetOrd * byteSize);
     slice.readFloats(value, 0, value.length);
@@ -77,6 +86,11 @@ abstract class OffHeapVectorValues extends VectorValues
   public BytesRef binaryValue(int targetOrd) throws IOException {
     readValue(targetOrd);
     return binaryValue;
+  }
+
+  @Override
+  public float score(float[] vector, int targetOrd) throws IOException {
+    return similarity.compare(vector, vectorValue(targetOrd));
   }
 
   private void readValue(int targetOrd) throws IOException {
@@ -94,7 +108,8 @@ abstract class OffHeapVectorValues extends VectorValues
     IndexInput bytesSlice =
         vectorData.slice("vector-data", fieldEntry.vectorDataOffset, fieldEntry.vectorDataLength);
     if (fieldEntry.docsWithFieldOffset == -1) {
-      return new DenseOffHeapVectorValues(fieldEntry.dimension, fieldEntry.size, bytesSlice);
+      return new DenseOffHeapVectorValues(
+          fieldEntry.similarityFunction, fieldEntry.dimension, fieldEntry.size, bytesSlice);
     } else {
       return new SparseOffHeapVectorValues(fieldEntry, vectorData, bytesSlice);
     }
@@ -106,8 +121,9 @@ abstract class OffHeapVectorValues extends VectorValues
 
     private int doc = -1;
 
-    public DenseOffHeapVectorValues(int dimension, int size, IndexInput slice) {
-      super(dimension, size, slice);
+    public DenseOffHeapVectorValues(
+        VectorSimilarityFunction similarity, int dimension, int size, IndexInput slice) {
+      super(dimension, similarity, size, slice);
     }
 
     @Override
@@ -145,7 +161,7 @@ abstract class OffHeapVectorValues extends VectorValues
 
     @Override
     public RandomAccessVectorValues randomAccess() throws IOException {
-      return new DenseOffHeapVectorValues(dimension, size, slice.clone());
+      return new DenseOffHeapVectorValues(similarity, dimension, size, slice.clone());
     }
 
     @Override
@@ -170,7 +186,7 @@ abstract class OffHeapVectorValues extends VectorValues
         Lucene93HnswVectorsReader.FieldEntry fieldEntry, IndexInput dataIn, IndexInput slice)
         throws IOException {
 
-      super(fieldEntry.dimension, fieldEntry.size, slice);
+      super(fieldEntry.dimension, fieldEntry.similarityFunction, fieldEntry.size, slice);
       this.fieldEntry = fieldEntry;
       final RandomAccessInput addressesData =
           dataIn.randomAccessSlice(fieldEntry.addressesOffset, fieldEntry.addressesLength);
@@ -248,7 +264,7 @@ abstract class OffHeapVectorValues extends VectorValues
   private static class EmptyOffHeapVectorValues extends OffHeapVectorValues {
 
     public EmptyOffHeapVectorValues(int dimension) {
-      super(dimension, 0, null);
+      super(dimension, VectorSimilarityFunction.EUCLIDEAN, 0, null);
     }
 
     private int doc = -1;

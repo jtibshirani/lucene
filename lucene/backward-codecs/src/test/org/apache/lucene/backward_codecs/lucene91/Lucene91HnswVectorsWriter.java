@@ -29,7 +29,6 @@ import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.IndexFileNames;
 import org.apache.lucene.index.RandomAccessVectorValuesProducer;
 import org.apache.lucene.index.SegmentWriteState;
-import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.store.IndexInput;
@@ -141,11 +140,13 @@ public final class Lucene91HnswVectorsWriter extends KnnVectorsWriter {
       // TODO: separate random access vector values from DocIdSetIterator?
       Lucene91HnswVectorsReader.OffHeapVectorValues offHeapVectors =
           new Lucene91HnswVectorsReader.OffHeapVectorValues(
-              vectors.dimension(), docsWithField.cardinality(), null, vectorDataInput);
+              vectors.dimension(),
+              fieldInfo.getVectorSimilarityFunction(),
+              docsWithField.cardinality(),
+              null,
+              vectorDataInput);
       Lucene91OnHeapHnswGraph graph =
-          offHeapVectors.size() == 0
-              ? null
-              : writeGraph(offHeapVectors, fieldInfo.getVectorSimilarityFunction());
+          offHeapVectors.size() == 0 ? null : writeGraph(offHeapVectors);
       long vectorIndexLength = vectorIndex.getFilePointer() - vectorIndexOffset;
       writeMeta(
           fieldInfo,
@@ -233,18 +234,13 @@ public final class Lucene91HnswVectorsWriter extends KnnVectorsWriter {
     }
   }
 
-  private Lucene91OnHeapHnswGraph writeGraph(
-      RandomAccessVectorValuesProducer vectorValues, VectorSimilarityFunction similarityFunction)
+  private Lucene91OnHeapHnswGraph writeGraph(RandomAccessVectorValuesProducer vectorValues)
       throws IOException {
 
     // build graph
     Lucene91HnswGraphBuilder hnswGraphBuilder =
         new Lucene91HnswGraphBuilder(
-            vectorValues,
-            similarityFunction,
-            maxConn,
-            beamWidth,
-            Lucene91HnswGraphBuilder.randSeed);
+            vectorValues, maxConn, beamWidth, Lucene91HnswGraphBuilder.randSeed);
     hnswGraphBuilder.setInfoStream(segmentWriteState.infoStream);
     Lucene91OnHeapHnswGraph graph = hnswGraphBuilder.build(vectorValues.randomAccess());
 

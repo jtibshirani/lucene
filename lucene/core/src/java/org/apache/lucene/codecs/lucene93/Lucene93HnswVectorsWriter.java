@@ -55,11 +55,15 @@ public final class Lucene93HnswVectorsWriter extends KnnVectorsWriter {
   private final IndexOutput meta, vectorData, vectorIndex;
   private final int maxDoc;
 
+  private final VectorSimilarityFunction similarity;
   private final int M;
   private final int beamWidth;
   private boolean finished;
 
-  Lucene93HnswVectorsWriter(SegmentWriteState state, int M, int beamWidth) throws IOException {
+  Lucene93HnswVectorsWriter(
+      SegmentWriteState state, VectorSimilarityFunction similarity, int M, int beamWidth)
+      throws IOException {
+    this.similarity = similarity;
     this.M = M;
     this.beamWidth = beamWidth;
 
@@ -147,11 +151,8 @@ public final class Lucene93HnswVectorsWriter extends KnnVectorsWriter {
       // TODO: separate random access vector values from DocIdSetIterator?
       OffHeapVectorValues offHeapVectors =
           new OffHeapVectorValues.DenseOffHeapVectorValues(
-              vectors.dimension(), docsWithField.cardinality(), vectorDataInput);
-      OnHeapHnswGraph graph =
-          offHeapVectors.size() == 0
-              ? null
-              : writeGraph(offHeapVectors, fieldInfo.getVectorSimilarityFunction());
+              similarity, vectors.dimension(), docsWithField.cardinality(), vectorDataInput);
+      OnHeapHnswGraph graph = offHeapVectors.size() == 0 ? null : writeGraph(offHeapVectors);
       long vectorIndexLength = vectorIndex.getFilePointer() - vectorIndexOffset;
       writeMeta(
           fieldInfo,
@@ -266,14 +267,12 @@ public final class Lucene93HnswVectorsWriter extends KnnVectorsWriter {
     }
   }
 
-  private OnHeapHnswGraph writeGraph(
-      RandomAccessVectorValuesProducer vectorValues, VectorSimilarityFunction similarityFunction)
+  private OnHeapHnswGraph writeGraph(RandomAccessVectorValuesProducer vectorValues)
       throws IOException {
 
     // build graph
     HnswGraphBuilder hnswGraphBuilder =
-        new HnswGraphBuilder(
-            vectorValues, similarityFunction, M, beamWidth, HnswGraphBuilder.randSeed);
+        new HnswGraphBuilder(vectorValues, M, beamWidth, HnswGraphBuilder.randSeed);
     hnswGraphBuilder.setInfoStream(segmentWriteState.infoStream);
     OnHeapHnswGraph graph = hnswGraphBuilder.build(vectorValues.randomAccess());
 

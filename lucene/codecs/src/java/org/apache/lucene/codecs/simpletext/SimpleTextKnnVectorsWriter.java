@@ -28,6 +28,7 @@ import org.apache.lucene.codecs.KnnVectorsWriter;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.IndexFileNames;
 import org.apache.lucene.index.SegmentWriteState;
+import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.util.BytesRef;
@@ -42,14 +43,19 @@ public class SimpleTextKnnVectorsWriter extends KnnVectorsWriter {
   static final BytesRef VECTOR_DATA_OFFSET = new BytesRef("vector-data-offset ");
   static final BytesRef VECTOR_DATA_LENGTH = new BytesRef("vector-data-length ");
   static final BytesRef VECTOR_DIMENSION = new BytesRef("vector-dimension ");
+  static final BytesRef VECTOR_SIMILARITY = new BytesRef("vector-similarity ");
+
   static final BytesRef SIZE = new BytesRef("size ");
 
+  private final VectorSimilarityFunction similarity;
   private final IndexOutput meta, vectorData;
   private final BytesRefBuilder scratch = new BytesRefBuilder();
 
-  SimpleTextKnnVectorsWriter(SegmentWriteState state) throws IOException {
+  SimpleTextKnnVectorsWriter(SegmentWriteState state, VectorSimilarityFunction similarity)
+      throws IOException {
     assert state.fieldInfos.hasVectorValues();
 
+    this.similarity = similarity;
     boolean success = false;
     // exception handling to pass TestSimpleTextKnnVectorsFormat#testRandomExceptions
     try {
@@ -105,6 +111,7 @@ public class SimpleTextKnnVectorsWriter extends KnnVectorsWriter {
     writeField(meta, VECTOR_DATA_OFFSET, vectorDataOffset);
     writeField(meta, VECTOR_DATA_LENGTH, vectorDataLength);
     writeField(meta, VECTOR_DIMENSION, field.getVectorDimension());
+    writeField(meta, VECTOR_SIMILARITY, similarity.name());
     writeField(meta, SIZE, docIds.size());
     for (Integer docId : docIds) {
       writeInt(meta, docId);

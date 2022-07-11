@@ -280,7 +280,8 @@ public final class Lucene90HnswVectorsReader extends KnnVectorsReader {
   private OffHeapVectorValues getOffHeapVectorValues(FieldEntry fieldEntry) throws IOException {
     IndexInput bytesSlice =
         vectorData.slice("vector-data", fieldEntry.vectorDataOffset, fieldEntry.vectorDataLength);
-    return new OffHeapVectorValues(fieldEntry.dimension, fieldEntry.ordToDoc, bytesSlice);
+    return new OffHeapVectorValues(
+        fieldEntry.dimension, fieldEntry.similarityFunction, fieldEntry.ordToDoc, bytesSlice);
   }
 
   private Bits getAcceptOrds(Bits acceptDocs, FieldEntry fieldEntry) {
@@ -368,6 +369,7 @@ public final class Lucene90HnswVectorsReader extends KnnVectorsReader {
       implements RandomAccessVectorValues, RandomAccessVectorValuesProducer {
 
     final int dimension;
+    final VectorSimilarityFunction similarity;
     final int[] ordToDoc;
     final IndexInput dataIn;
 
@@ -379,8 +381,10 @@ public final class Lucene90HnswVectorsReader extends KnnVectorsReader {
     int ord = -1;
     int doc = -1;
 
-    OffHeapVectorValues(int dimension, int[] ordToDoc, IndexInput dataIn) {
+    OffHeapVectorValues(
+        int dimension, VectorSimilarityFunction similarity, int[] ordToDoc, IndexInput dataIn) {
       this.dimension = dimension;
+      this.similarity = similarity;
       this.ordToDoc = ordToDoc;
       this.dataIn = dataIn;
 
@@ -412,6 +416,11 @@ public final class Lucene90HnswVectorsReader extends KnnVectorsReader {
       dataIn.seek((long) ord * byteSize);
       dataIn.readBytes(byteBuffer.array(), byteBuffer.arrayOffset(), byteSize, false);
       return binaryValue;
+    }
+
+    @Override
+    public float score(float[] vector) throws IOException {
+      return similarity.compare(vector, vectorValue());
     }
 
     @Override
@@ -452,7 +461,7 @@ public final class Lucene90HnswVectorsReader extends KnnVectorsReader {
 
     @Override
     public RandomAccessVectorValues randomAccess() {
-      return new OffHeapVectorValues(dimension, ordToDoc, dataIn.clone());
+      return new OffHeapVectorValues(dimension, similarity, ordToDoc, dataIn.clone());
     }
 
     @Override
@@ -466,6 +475,11 @@ public final class Lucene90HnswVectorsReader extends KnnVectorsReader {
     public BytesRef binaryValue(int targetOrd) throws IOException {
       readValue(targetOrd);
       return binaryValue;
+    }
+
+    @Override
+    public float score(float[] vector, int targetOrd) throws IOException {
+      return similarity.compare(vector, vectorValue(targetOrd));
     }
 
     private void readValue(int targetOrd) throws IOException {

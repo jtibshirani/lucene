@@ -258,8 +258,7 @@ public class KnnGraphTester {
   private void dumpGraph(Path docsPath) throws IOException {
     try (BinaryFileVectors vectors = new BinaryFileVectors(docsPath)) {
       RandomAccessVectorValues values = vectors.randomAccess();
-      HnswGraphBuilder builder =
-          new HnswGraphBuilder(vectors, similarityFunction, maxConn, beamWidth, 0);
+      HnswGraphBuilder builder = new HnswGraphBuilder(vectors, maxConn, beamWidth, 0);
       // start at node 1
       for (int i = 1; i < numDocs; i++) {
         builder.addGraphNode(i, values.vectorValue(i));
@@ -582,7 +581,7 @@ public class KnnGraphTester {
         new Lucene93Codec() {
           @Override
           public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
-            return new Lucene93HnswVectorsFormat(maxConn, beamWidth);
+            return new Lucene93HnswVectorsFormat(similarityFunction, maxConn, beamWidth);
           }
         });
     // iwc.setMergePolicy(NoMergePolicy.INSTANCE);
@@ -694,6 +693,11 @@ public class KnnGraphTester {
       @Override
       public BytesRef binaryValue(int targetOrd) {
         throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public float score(float[] vector, int targetOrd) throws IOException {
+        return similarityFunction.compare(vector, vectorValue(targetOrd));
       }
     }
   }

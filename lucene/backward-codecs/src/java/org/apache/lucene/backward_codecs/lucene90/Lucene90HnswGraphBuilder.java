@@ -233,8 +233,7 @@ public final class Lucene90HnswGraphBuilder {
       throws IOException {
     bound.set(score);
     for (int i = 0; i < neighbors.size(); i++) {
-      float neighborSimilarity =
-          similarityFunction.compare(candidate, vectorValues.vectorValue(neighbors.node()[i]));
+      float neighborSimilarity = vectorValues.score(candidate, neighbors.node()[i]);
       if (bound.check(neighborSimilarity) == false) {
         return false;
       }
@@ -270,9 +269,7 @@ public final class Lucene90HnswGraphBuilder {
       bound.set(neighbors.score()[i]);
       float[] neighborVector = vectorValues.vectorValue(neighborId);
       for (int j = maxConn; j > i; j--) {
-        float neighborSimilarity =
-            similarityFunction.compare(
-                neighborVector, buildVectors.vectorValue(neighbors.node()[j]));
+        float neighborSimilarity = buildVectors.score(neighborVector, neighbors.node()[j]);
         if (bound.check(neighborSimilarity) == false) {
           // node j is too similar to node i given its score relative to the base node
           // replace it with the new node, which is at [maxConn]

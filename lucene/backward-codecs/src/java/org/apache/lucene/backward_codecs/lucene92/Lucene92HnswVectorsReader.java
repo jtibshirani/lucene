@@ -237,7 +237,6 @@ public final class Lucene92HnswVectorsReader extends KnnVectorsReader {
             target,
             k,
             vectorValues,
-            fieldEntry.similarityFunction,
             getGraph(fieldEntry),
             vectorValues.getAcceptOrds(acceptDocs),
             visitedLimit);

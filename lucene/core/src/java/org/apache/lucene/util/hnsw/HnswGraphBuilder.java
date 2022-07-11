@@ -21,11 +21,9 @@ import static java.lang.Math.log;
 
 import java.io.IOException;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.SplittableRandom;
 import org.apache.lucene.index.RandomAccessVectorValues;
 import org.apache.lucene.index.RandomAccessVectorValuesProducer;
-import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.util.FixedBitSet;
 import org.apache.lucene.util.InfoStream;
 
@@ -48,7 +46,6 @@ public final class HnswGraphBuilder {
   private final double ml;
   private final NeighborArray scratch;
 
-  private final VectorSimilarityFunction similarityFunction;
   private final RandomAccessVectorValues vectorValues;
   private final SplittableRandom random;
   private final HnswGraphSearcher graphSearcher;
@@ -73,16 +70,10 @@ public final class HnswGraphBuilder {
    * @param seed the seed for a random number generator used during graph construction. Provide this
    *     to ensure repeatable construction.
    */
-  public HnswGraphBuilder(
-      RandomAccessVectorValuesProducer vectors,
-      VectorSimilarityFunction similarityFunction,
-      int M,
-      int beamWidth,
-      long seed)
+  public HnswGraphBuilder(RandomAccessVectorValuesProducer vectors, int M, int beamWidth, long seed)
       throws IOException {
     vectorValues = vectors.randomAccess();
     buildVectors = vectors.randomAccess();
-    this.similarityFunction = Objects.requireNonNull(similarityFunction);
     if (M <= 0) {
       throw new IllegalArgumentException("maxConn must be positive");
     }
@@ -98,9 +89,7 @@ public final class HnswGraphBuilder {
     this.hnsw = new OnHeapHnswGraph(M, levelOfFirstNode);
     this.graphSearcher =
         new HnswGraphSearcher(
-            similarityFunction,
-            new NeighborQueue(beamWidth, true),
-            new FixedBitSet(vectorValues.size()));
+            new NeighborQueue(beamWidth, true), new FixedBitSet(vectorValues.size()));
     // in scratch we store candidates in reverse order: worse candidates are first
     scratch = new NeighborArray(Math.max(beamWidth, M + 1), false);
   }
@@ -244,8 +233,7 @@ public final class HnswGraphBuilder {
       RandomAccessVectorValues vectorValues)
       throws IOException {
     for (int i = 0; i < neighbors.size(); i++) {
-      float neighborSimilarity =
-          similarityFunction.compare(candidate, vectorValues.vectorValue(neighbors.node[i]));
+      float neighborSimilarity = vectorValues.score(candidate, neighbors.node[i]);
       if (neighborSimilarity >= score) {
         return false;
       }
@@ -265,8 +253,7 @@ public final class HnswGraphBuilder {
       minAcceptedSimilarity = neighbors.score[i];
       // check the candidate against its better-scoring neighbors
       for (int j = i - 1; j >= 0; j--) {
-        float neighborSimilarity =
-            similarityFunction.compare(cVector, buildVectors.vectorValue(neighbors.node[j]));
+        float neighborSimilarity = buildVectors.score(cVector, neighbors.node[j]);
         // node i is too similar to node j given its score relative to the base node
         if (neighborSimilarity >= minAcceptedSimilarity) {
           return i;

@@ -130,7 +130,11 @@ class VectorValuesWriter {
           @Override
           public VectorValues getVectorValues(String field) throws IOException {
             VectorValues vectorValues =
-                new BufferedVectorValues(docsWithField, vectors, fieldInfo.getVectorDimension());
+                new BufferedVectorValues(
+                    docsWithField,
+                    vectors,
+                    fieldInfo.getVectorDimension(),
+                    fieldInfo.getVectorSimilarityFunction());
             return sortMap != null ? new SortingVectorValues(vectorValues, sortMap) : vectorValues;
           }
 
@@ -205,6 +209,11 @@ class VectorValuesWriter {
     }
 
     @Override
+    public float score(float[] vector) throws IOException {
+      return randomAccess.score(vector, docIdOffsets[docId] - 1);
+    }
+
+    @Override
     public int dimension() {
       return delegate.dimension();
     }
@@ -252,6 +261,11 @@ class VectorValuesWriter {
         public BytesRef binaryValue(int targetOrd) {
           throw new UnsupportedOperationException();
         }
+
+        @Override
+        public float score(float[] vector, int targetOrd) throws IOException {
+          return delegateRA.score(vector, ordMap[targetOrd]);
+        }
       };
     }
   }
@@ -264,6 +278,7 @@ class VectorValuesWriter {
     // These are always the vectors of a VectorValuesWriter, which are copied when added to it
     final List<float[]> vectors;
     final int dimension;
+    final VectorSimilarityFunction similarity;
 
     final ByteBuffer buffer;
     final BytesRef binaryValue;
@@ -273,10 +288,15 @@ class VectorValuesWriter {
     DocIdSetIterator docsWithFieldIter;
     int ord = -1;
 
-    BufferedVectorValues(DocsWithFieldSet docsWithField, List<float[]> vectors, int dimension) {
+    BufferedVectorValues(
+        DocsWithFieldSet docsWithField,
+        List<float[]> vectors,
+        int dimension,
+        VectorSimilarityFunction similarity) {
       this.docsWithField = docsWithField;
       this.vectors = vectors;
       this.dimension = dimension;
+      this.similarity = similarity;
       buffer = ByteBuffer.allocate(dimension * Float.BYTES).order(ByteOrder.LITTLE_ENDIAN);
       binaryValue = new BytesRef(buffer.array());
       raBuffer = ByteBuffer.allocate(dimension * Float.BYTES).order(ByteOrder.LITTLE_ENDIAN);
@@ -286,7 +306,7 @@ class VectorValuesWriter {
 
     @Override
     public RandomAccessVectorValues randomAccess() {
-      return new BufferedVectorValues(docsWithField, vectors, dimension);
+      return new BufferedVectorValues(docsWithField, vectors, dimension, similarity);
     }
 
     @Override
@@ -319,6 +339,16 @@ class VectorValuesWriter {
     @Override
     public float[] vectorValue(int targetOrd) {
       return vectors.get(targetOrd);
+    }
+
+    @Override
+    public float score(float[] vector) throws IOException {
+      return similarity.compare(vector, vectorValue());
+    }
+
+    @Override
+    public float score(float[] vector, int targetOrd) throws IOException {
+      return similarity.compare(vector, vectorValue(targetOrd));
     }
 
     @Override

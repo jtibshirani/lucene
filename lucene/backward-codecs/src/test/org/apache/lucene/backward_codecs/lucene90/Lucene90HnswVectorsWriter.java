@@ -134,7 +134,10 @@ public final class Lucene90HnswVectorsWriter extends KnnVectorsWriter {
       // build the graph using the temporary vector data
       Lucene90HnswVectorsReader.OffHeapVectorValues offHeapVectors =
           new Lucene90HnswVectorsReader.OffHeapVectorValues(
-              vectors.dimension(), docIds, vectorDataInput);
+              vectors.dimension(),
+              fieldInfo.getVectorSimilarityFunction(),
+              docIds,
+              vectorDataInput);
 
       long[] offsets = new long[docIds.length];
       long vectorIndexOffset = vectorIndex.getFilePointer();

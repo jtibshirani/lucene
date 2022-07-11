@@ -21,11 +21,9 @@ import static java.lang.Math.log;
 
 import java.io.IOException;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.SplittableRandom;
 import org.apache.lucene.index.RandomAccessVectorValues;
 import org.apache.lucene.index.RandomAccessVectorValuesProducer;
-import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.util.FixedBitSet;
 import org.apache.lucene.util.InfoStream;
 import org.apache.lucene.util.hnsw.HnswGraph;
@@ -51,7 +49,6 @@ public final class Lucene91HnswGraphBuilder {
   private final double ml;
   private final Lucene91NeighborArray scratch;
 
-  private final VectorSimilarityFunction similarityFunction;
   private final RandomAccessVectorValues vectorValues;
   private final SplittableRandom random;
   private final Lucene91BoundsChecker bound;
@@ -78,15 +75,10 @@ public final class Lucene91HnswGraphBuilder {
    *     to ensure repeatable construction.
    */
   public Lucene91HnswGraphBuilder(
-      RandomAccessVectorValuesProducer vectors,
-      VectorSimilarityFunction similarityFunction,
-      int maxConn,
-      int beamWidth,
-      long seed)
+      RandomAccessVectorValuesProducer vectors, int maxConn, int beamWidth, long seed)
       throws IOException {
     vectorValues = vectors.randomAccess();
     buildVectors = vectors.randomAccess();
-    this.similarityFunction = Objects.requireNonNull(similarityFunction);
     if (maxConn <= 0) {
       throw new IllegalArgumentException("maxConn must be positive");
     }
@@ -102,9 +94,7 @@ public final class Lucene91HnswGraphBuilder {
     this.hnsw = new Lucene91OnHeapHnswGraph(maxConn, levelOfFirstNode);
     this.graphSearcher =
         new HnswGraphSearcher(
-            similarityFunction,
-            new NeighborQueue(beamWidth, true),
-            new FixedBitSet(vectorValues.size()));
+            new NeighborQueue(beamWidth, true), new FixedBitSet(vectorValues.size()));
     bound = Lucene91BoundsChecker.create(false);
     scratch = new Lucene91NeighborArray(Math.max(beamWidth, maxConn + 1));
   }
@@ -252,8 +242,7 @@ public final class Lucene91HnswGraphBuilder {
       throws IOException {
     bound.set(score);
     for (int i = 0; i < neighbors.size(); i++) {
-      float neighborSimilarity =
-          similarityFunction.compare(candidate, vectorValues.vectorValue(neighbors.node[i]));
+      float neighborSimilarity = vectorValues.score(candidate, neighbors.node[i]);
       if (bound.check(neighborSimilarity) == false) {
         return false;
       }
@@ -289,8 +278,7 @@ public final class Lucene91HnswGraphBuilder {
       bound.set(neighbors.score[i]);
       float[] neighborVector = vectorValues.vectorValue(neighborId);
       for (int j = maxConn; j > i; j--) {
-        float neighborSimilarity =
-            similarityFunction.compare(neighborVector, buildVectors.vectorValue(neighbors.node[j]));
+        float neighborSimilarity = buildVectors.score(neighborVector, neighbors.node[j]);
         if (bound.check(neighborSimilarity) == false) {
           // node j is too similar to node i given its score relative to the base node
           // replace it with the new node, which is at [maxConn]

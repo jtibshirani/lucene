@@ -90,6 +90,8 @@ public class SimpleTextKnnVectorsReader extends KnnVectorsReader {
         long vectorDataOffset = readLong(in, VECTOR_DATA_OFFSET);
         long vectorDataLength = readLong(in, VECTOR_DATA_LENGTH);
         int dimension = readInt(in, VECTOR_DIMENSION);
+        VectorSimilarityFunction similarity =
+            VectorSimilarityFunction.valueOf(readString(in, VECTOR_SIMILARITY));
         int size = readInt(in, SIZE);
         int[] docIds = new int[size];
         for (int i = 0; i < size; i++) {
@@ -97,7 +99,8 @@ public class SimpleTextKnnVectorsReader extends KnnVectorsReader {
         }
         assert fieldEntries.containsKey(fieldName) == false;
         fieldEntries.put(
-            fieldName, new FieldEntry(dimension, vectorDataOffset, vectorDataLength, docIds));
+            fieldName,
+            new FieldEntry(dimension, similarity, vectorDataOffset, vectorDataLength, docIds));
         fieldNumber = readInt(in, FIELD_NUMBER);
       }
       SimpleTextUtil.checkFooter(in);
@@ -151,10 +154,8 @@ public class SimpleTextKnnVectorsReader extends KnnVectorsReader {
       throw new IllegalArgumentException(
           "vector dimensions differ: " + target.length + "!=" + values.dimension());
     }
-    FieldInfo info = readState.fieldInfos.fieldInfo(field);
-    VectorSimilarityFunction vectorSimilarity = info.getVectorSimilarityFunction();
-    HitQueue topK = new HitQueue(k, false);
 
+    HitQueue topK = new HitQueue(k, false);
     int numVisited = 0;
     TotalHits.Relation relation = TotalHits.Relation.EQUAL_TO;
 
@@ -169,8 +170,7 @@ public class SimpleTextKnnVectorsReader extends KnnVectorsReader {
         break;
       }
 
-      float[] vector = values.vectorValue();
-      float score = vectorSimilarity.compare(vector, target);
+      float score = values.score(target);
       topK.insertWithOverflow(new ScoreDoc(doc, score));
       numVisited++;
     }
@@ -239,13 +239,20 @@ public class SimpleTextKnnVectorsReader extends KnnVectorsReader {
   private static class FieldEntry {
 
     final int dimension;
+    final VectorSimilarityFunction similarity;
 
     final long vectorDataOffset;
     final long vectorDataLength;
     final int[] ordToDoc;
 
-    FieldEntry(int dimension, long vectorDataOffset, long vectorDataLength, int[] ordToDoc) {
+    FieldEntry(
+        int dimension,
+        VectorSimilarityFunction similarity,
+        long vectorDataOffset,
+        long vectorDataLength,
+        int[] ordToDoc) {
       this.dimension = dimension;
+      this.similarity = similarity;
       this.vectorDataOffset = vectorDataOffset;
       this.vectorDataLength = vectorDataLength;
       this.ordToDoc = ordToDoc;
@@ -296,6 +303,11 @@ public class SimpleTextKnnVectorsReader extends KnnVectorsReader {
     public BytesRef binaryValue() {
       ByteBuffer.wrap(binaryValue.bytes).asFloatBuffer().get(values[curOrd]);
       return binaryValue;
+    }
+
+    @Override
+    public float score(float[] vector) throws IOException {
+      return entry.similarity.compare(vector, vectorValue());
     }
 
     @Override
@@ -361,6 +373,11 @@ public class SimpleTextKnnVectorsReader extends KnnVectorsReader {
     @Override
     public BytesRef binaryValue(int targetOrd) throws IOException {
       throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public float score(float[] vector, int targetOrd) throws IOException {
+      return entry.similarity.compare(vector, vectorValue(targetOrd));
     }
   }
 

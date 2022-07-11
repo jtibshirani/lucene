@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.lucene.index.DocIDMerger;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.MergeState;
+import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.util.Bits;
@@ -121,6 +122,7 @@ public abstract class KnnVectorsWriter implements Closeable {
   private static class MergedVectorValues extends VectorValues {
     private final List<VectorValuesSub> subs;
     private final DocIDMerger<VectorValuesSub> docIdMerger;
+    private final VectorSimilarityFunction similarity;
     private final int cost;
     private final int size;
 
@@ -142,12 +144,14 @@ public abstract class KnnVectorsWriter implements Closeable {
           }
         }
       }
-      return new MergedVectorValues(subs, mergeState);
+      return new MergedVectorValues(subs, fieldInfo.getVectorSimilarityFunction(), mergeState);
     }
 
-    private MergedVectorValues(List<VectorValuesSub> subs, MergeState mergeState)
+    private MergedVectorValues(
+        List<VectorValuesSub> subs, VectorSimilarityFunction similarity, MergeState mergeState)
         throws IOException {
       this.subs = subs;
+      this.similarity = similarity;
       docIdMerger = DocIDMerger.of(subs, mergeState.needsIndexSort);
       int totalCost = 0, totalSize = 0;
       for (VectorValuesSub sub : subs) {
@@ -183,6 +187,11 @@ public abstract class KnnVectorsWriter implements Closeable {
     @Override
     public BytesRef binaryValue() throws IOException {
       return current.values.binaryValue();
+    }
+
+    @Override
+    public float score(float[] vector) throws IOException {
+      return similarity.compare(vector, vectorValue());
     }
 
     @Override

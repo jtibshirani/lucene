@@ -17,8 +17,10 @@
 
 package org.apache.lucene.util.hnsw;
 
+import java.io.IOException;
 import org.apache.lucene.index.RandomAccessVectorValues;
 import org.apache.lucene.index.RandomAccessVectorValuesProducer;
+import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.tests.util.LuceneTestCase;
 import org.apache.lucene.util.BytesRef;
@@ -28,15 +30,17 @@ class MockVectorValues extends VectorValues
   private final float[] scratch;
 
   protected final int dimension;
+  protected VectorSimilarityFunction similarity;
   protected final float[][] denseValues;
   protected final float[][] values;
   private final int numVectors;
 
   private int pos = -1;
 
-  MockVectorValues(float[][] values) {
+  MockVectorValues(float[][] values, VectorSimilarityFunction similarity) {
     this.dimension = values[0].length;
     this.values = values;
+    this.similarity = similarity;
     int maxDoc = values.length;
     denseValues = new float[maxDoc][];
     int count = 0;
@@ -50,7 +54,7 @@ class MockVectorValues extends VectorValues
   }
 
   public MockVectorValues copy() {
-    return new MockVectorValues(values);
+    return new MockVectorValues(values, similarity);
   }
 
   @Override
@@ -78,6 +82,11 @@ class MockVectorValues extends VectorValues
   }
 
   @Override
+  public float score(float[] vector) throws IOException {
+    return similarity.compare(vector, vectorValue());
+  }
+
+  @Override
   public RandomAccessVectorValues randomAccess() {
     return copy();
   }
@@ -90,6 +99,11 @@ class MockVectorValues extends VectorValues
   @Override
   public BytesRef binaryValue(int targetOrd) {
     return null;
+  }
+
+  @Override
+  public float score(float[] vector, int targetOrd) throws IOException {
+    return similarity.compare(vector, vectorValue(targetOrd));
   }
 
   private boolean seek(int target) {
