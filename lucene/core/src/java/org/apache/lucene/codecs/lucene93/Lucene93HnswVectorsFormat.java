@@ -164,7 +164,9 @@ public final class Lucene93HnswVectorsFormat extends KnnVectorsFormat {
 
   @Override
   public String toString() {
-    return "Lucene93HnswVectorsFormat(name=Lucene93HnswVectorsFormat, maxConn="
+    return "Lucene93HnswVectorsFormat(name=Lucene93HnswVectorsFormat, similarity="
+        + similarity.toString()
+        + ", maxConn="
         + maxConn
         + ", beamWidth="
         + beamWidth

@@ -130,11 +130,7 @@ class VectorValuesWriter {
           @Override
           public VectorValues getVectorValues(String field) throws IOException {
             VectorValues vectorValues =
-                new BufferedVectorValues(
-                    docsWithField,
-                    vectors,
-                    fieldInfo.getVectorDimension(),
-                    fieldInfo.getVectorSimilarityFunction());
+                new BufferedVectorValues(docsWithField, vectors, fieldInfo.getVectorDimension());
             return sortMap != null ? new SortingVectorValues(vectorValues, sortMap) : vectorValues;
           }
 
@@ -278,7 +274,6 @@ class VectorValuesWriter {
     // These are always the vectors of a VectorValuesWriter, which are copied when added to it
     final List<float[]> vectors;
     final int dimension;
-    final VectorSimilarityFunction similarity;
 
     final ByteBuffer buffer;
     final BytesRef binaryValue;
@@ -288,15 +283,10 @@ class VectorValuesWriter {
     DocIdSetIterator docsWithFieldIter;
     int ord = -1;
 
-    BufferedVectorValues(
-        DocsWithFieldSet docsWithField,
-        List<float[]> vectors,
-        int dimension,
-        VectorSimilarityFunction similarity) {
+    BufferedVectorValues(DocsWithFieldSet docsWithField, List<float[]> vectors, int dimension) {
       this.docsWithField = docsWithField;
       this.vectors = vectors;
       this.dimension = dimension;
-      this.similarity = similarity;
       buffer = ByteBuffer.allocate(dimension * Float.BYTES).order(ByteOrder.LITTLE_ENDIAN);
       binaryValue = new BytesRef(buffer.array());
       raBuffer = ByteBuffer.allocate(dimension * Float.BYTES).order(ByteOrder.LITTLE_ENDIAN);
@@ -306,7 +296,7 @@ class VectorValuesWriter {
 
     @Override
     public RandomAccessVectorValues randomAccess() {
-      return new BufferedVectorValues(docsWithField, vectors, dimension, similarity);
+      return new BufferedVectorValues(docsWithField, vectors, dimension);
     }
 
     @Override
@@ -343,12 +333,12 @@ class VectorValuesWriter {
 
     @Override
     public float score(float[] vector) throws IOException {
-      return similarity.compare(vector, vectorValue());
+      throw new UnsupportedOperationException();
     }
 
     @Override
     public float score(float[] vector, int targetOrd) throws IOException {
-      return similarity.compare(vector, vectorValue(targetOrd));
+      throw new UnsupportedOperationException();
     }
 
     @Override

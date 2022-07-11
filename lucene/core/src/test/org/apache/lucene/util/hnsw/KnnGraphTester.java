@@ -588,7 +588,7 @@ public class KnnGraphTester {
     iwc.setRAMBufferSizeMB(1994d);
     // iwc.setMaxBufferedDocs(10000);
 
-    FieldType fieldType = KnnVectorField.createFieldType(dim, similarityFunction);
+    FieldType fieldType = KnnVectorField.createFieldType(dim);
     if (quiet == false) {
       iwc.setInfoStream(new PrintStreamInfoStream(System.out));
       System.out.println("creating index in " + indexPath);

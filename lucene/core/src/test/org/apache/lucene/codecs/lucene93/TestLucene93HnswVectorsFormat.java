@@ -33,11 +33,11 @@ public class TestLucene93HnswVectorsFormat extends BaseKnnVectorsFormatTestCase 
         new Lucene93Codec() {
           @Override
           public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
-            return new Lucene93HnswVectorsFormat(VectorSimilarityFunction.EUCLIDEAN, 10, 20);
+            return new Lucene93HnswVectorsFormat(VectorSimilarityFunction.DOT_PRODUCT, 10, 20);
           }
         };
     String expectedString =
-        "Lucene93HnswVectorsFormat(name=Lucene93HnswVectorsFormat, maxConn=10, beamWidth=20)";
+        "Lucene93HnswVectorsFormat(name=Lucene93HnswVectorsFormat, similarity=DOT_PRODUCT, maxConn=10, beamWidth=20)";
     assertEquals(expectedString, customCodec.getKnnVectorsFormatForField("bogus_field").toString());
   }
 }

@@ -16,7 +16,6 @@
  */
 package org.apache.lucene.tests.index;
 
-import com.carrotsearch.randomizedtesting.generators.RandomPicks;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -305,7 +304,7 @@ public abstract class BaseFieldInfoFormatTestCase extends BaseIndexFileFormatTes
               fieldType.pointIndexDimensionCount(),
               fieldType.pointNumBytes(),
               fieldType.vectorDimension(),
-              fieldType.vectorSimilarityFunction(),
+              VectorSimilarityFunction.EUCLIDEAN,
               field.equals(softDeletesField));
       addAttributes(fi);
       builder.add(fi);
@@ -351,9 +350,7 @@ public abstract class BaseFieldInfoFormatTestCase extends BaseIndexFileFormatTes
 
     if (r.nextBoolean()) {
       int dimension = 1 + r.nextInt(VectorValues.MAX_DIMENSIONS);
-      VectorSimilarityFunction similarityFunction =
-          RandomPicks.randomFrom(r, VectorSimilarityFunction.values());
-      type.setVectorDimensionsAndSimilarityFunction(dimension, similarityFunction);
+      type.setVectorDimension(dimension);
     }
 
     return type;

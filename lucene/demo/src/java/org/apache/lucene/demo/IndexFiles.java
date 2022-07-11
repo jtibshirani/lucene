@@ -30,6 +30,9 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Date;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.codecs.KnnVectorsFormat;
+import org.apache.lucene.codecs.lucene93.Lucene93Codec;
+import org.apache.lucene.codecs.lucene93.Lucene93HnswVectorsFormat;
 import org.apache.lucene.demo.knn.DemoEmbeddings;
 import org.apache.lucene.demo.knn.KnnVectorDict;
 import org.apache.lucene.document.Document;
@@ -150,6 +153,18 @@ public class IndexFiles implements AutoCloseable {
         KnnVectorDict.build(Paths.get(vectorDictSource), dir, KNN_DICT);
         vectorDictInstance = new KnnVectorDict(dir, KNN_DICT);
         vectorDictSize = vectorDictInstance.ramBytesUsed();
+
+        // Set the similarity function to dot product
+        iwc.setCodec(
+            new Lucene93Codec() {
+              @Override
+              public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
+                return new Lucene93HnswVectorsFormat(
+                    VectorSimilarityFunction.DOT_PRODUCT,
+                    Lucene93HnswVectorsFormat.DEFAULT_MAX_CONN,
+                    Lucene93HnswVectorsFormat.DEFAULT_BEAM_WIDTH);
+              }
+            });
       }
 
       try (IndexWriter writer = new IndexWriter(dir, iwc);
@@ -260,8 +275,7 @@ public class IndexFiles implements AutoCloseable {
           float[] vector =
               demoEmbeddings.computeEmbedding(
                   new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8)));
-          doc.add(
-              new KnnVectorField("contents-vector", vector, VectorSimilarityFunction.DOT_PRODUCT));
+          doc.add(new KnnVectorField("contents-vector", vector));
         }
       }
 

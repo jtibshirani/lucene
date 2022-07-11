@@ -471,6 +471,7 @@ public final class FieldInfo {
   }
 
   /** Returns {@link VectorSimilarityFunction} for the field */
+  @Deprecated
   public VectorSimilarityFunction getVectorSimilarityFunction() {
     return vectorSimilarityFunction;
   }

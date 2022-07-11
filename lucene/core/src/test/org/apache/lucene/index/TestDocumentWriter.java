@@ -380,9 +380,6 @@ public class TestDocumentWriter extends LuceneTestCase {
   }
 
   public void testRAMUsageVector() throws IOException {
-    doTestRAMUsage(
-        field ->
-            new KnnVectorField(
-                field, new float[] {1, 2, 3, 4}, VectorSimilarityFunction.EUCLIDEAN));
+    doTestRAMUsage(field -> new KnnVectorField(field, new float[] {1, 2, 3, 4}));
   }
 }

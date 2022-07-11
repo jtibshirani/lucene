@@ -825,7 +825,7 @@ final class IndexingChain implements Accountable {
           fieldType.pointNumBytes());
     }
     if (fieldType.vectorDimension() != 0) {
-      schema.setVectors(fieldType.vectorSimilarityFunction(), fieldType.vectorDimension());
+      schema.setVectors(fieldType.vectorDimension());
     }
     if (fieldType.getAttributes() != null && fieldType.getAttributes().isEmpty() == false) {
       schema.updateAttributes(fieldType.getAttributes());
@@ -1406,12 +1406,10 @@ final class IndexingChain implements Accountable {
       }
     }
 
-    void setVectors(VectorSimilarityFunction similarityFunction, int dimension) {
+    void setVectors(int dimension) {
       if (vectorDimension == 0) {
         this.vectorDimension = dimension;
-        this.vectorSimilarityFunction = similarityFunction;
       } else {
-        assertSame("vector similarity function", vectorSimilarityFunction, similarityFunction);
         assertSame("vector dimension", vectorDimension, dimension);
       }
     }
@@ -1434,8 +1432,6 @@ final class IndexingChain implements Accountable {
       assertSame("omit norms", fi.omitsNorms(), omitNorms);
       assertSame("store term vector", fi.hasVectors(), storeTermVector);
       assertSame("doc values type", fi.getDocValuesType(), docValuesType);
-      assertSame(
-          "vector similarity function", fi.getVectorSimilarityFunction(), vectorSimilarityFunction);
       assertSame("vector dimension", fi.getVectorDimension(), vectorDimension);
       assertSame("point dimension", fi.getPointDimensionCount(), pointDimensionCount);
       assertSame(

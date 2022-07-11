@@ -446,8 +446,7 @@ public class TestExitableDirectoryReader extends LuceneTestCase {
       for (int j = 0; j < dimension; j++) {
         value[j] = random().nextFloat();
       }
-      FieldType fieldType =
-          KnnVectorField.createFieldType(dimension, VectorSimilarityFunction.COSINE);
+      FieldType fieldType = KnnVectorField.createFieldType(dimension);
       doc.add(new KnnVectorField("vector", value, fieldType));
 
       doc.add(new StringField("id", Integer.toString(i), Field.Store.YES));

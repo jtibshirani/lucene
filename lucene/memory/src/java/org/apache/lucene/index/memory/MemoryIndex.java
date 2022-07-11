@@ -514,7 +514,7 @@ public class MemoryIndex {
         fieldType.pointIndexDimensionCount(),
         fieldType.pointNumBytes(),
         fieldType.vectorDimension(),
-        fieldType.vectorSimilarityFunction(),
+        VectorSimilarityFunction.EUCLIDEAN,
         false);
   }
 

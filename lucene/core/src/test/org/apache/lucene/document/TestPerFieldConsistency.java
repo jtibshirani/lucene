@@ -32,7 +32,6 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.NoMergePolicy;
-import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.tests.util.LuceneTestCase;
 import org.apache.lucene.util.BytesRef;
@@ -87,21 +86,19 @@ public class TestPerFieldConsistency extends LuceneTestCase {
     }
   }
 
-  private static Field randomKnnVectorField(Random random, String fieldName) {
-    VectorSimilarityFunction similarityFunction =
-        RandomPicks.randomFrom(random, VectorSimilarityFunction.values());
+  private static Field randomKnnVectorField(String fieldName) {
     float[] values = new float[randomIntBetween(1, 10)];
     for (int i = 0; i < values.length; i++) {
       values[i] = randomFloat();
     }
-    return new KnnVectorField(fieldName, values, similarityFunction);
+    return new KnnVectorField(fieldName, values);
   }
 
   private static Field[] randomFieldsWithTheSameName(String fieldName) {
     final Field textField = randomIndexedField(random(), fieldName);
     final Field docValuesField = randomDocValuesField(random(), fieldName);
     final Field pointField = randomPointField(random(), fieldName);
-    final Field vectorField = randomKnnVectorField(random(), fieldName);
+    final Field vectorField = randomKnnVectorField(fieldName);
     return new Field[] {textField, docValuesField, pointField, vectorField};
   }
 
