@@ -226,12 +226,7 @@ public final class FieldInfo {
         o.pointDimensionCount,
         o.pointIndexDimensionCount,
         o.pointNumBytes);
-    verifySameVectorOptions(
-        fieldName,
-        this.vectorDimension,
-        this.vectorSimilarityFunction,
-        o.vectorDimension,
-        o.vectorSimilarityFunction);
+    verifySameVectorOptions(fieldName, this.vectorDimension, o.vectorDimension);
   }
 
   /**
@@ -344,24 +339,15 @@ public final class FieldInfo {
    *
    * @throws IllegalArgumentException if they are not the same
    */
-  static void verifySameVectorOptions(
-      String fieldName,
-      int vd1,
-      VectorSimilarityFunction vsf1,
-      int vd2,
-      VectorSimilarityFunction vsf2) {
-    if (vd1 != vd2 || vsf1 != vsf2) {
+  static void verifySameVectorOptions(String fieldName, int vd1, int vd2) {
+    if (vd1 != vd2) {
       throw new IllegalArgumentException(
           "cannot change field \""
               + fieldName
               + "\" from vector dimension="
               + vd1
-              + ", vector similarity function="
-              + vsf1
               + " to inconsistent vector dimension="
-              + vd2
-              + ", vector similarity function="
-              + vsf2);
+              + vd2);
     }
   }
 

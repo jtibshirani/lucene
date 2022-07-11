@@ -129,8 +129,8 @@ public abstract class BaseKnnVectorsFormatTestCase extends BaseIndexFileFormatTe
       IllegalArgumentException expected =
           expectThrows(IllegalArgumentException.class, () -> w.addDocument(doc2));
       String errMsg =
-          "cannot change field \"f\" from vector dimension=4, vector similarity function=EUCLIDEAN "
-              + "to inconsistent vector dimension=3, vector similarity function=EUCLIDEAN";
+          "cannot change field \"f\" from vector dimension=4 "
+              + "to inconsistent vector dimension=3";
       assertEquals(errMsg, expected.getMessage());
     }
   }
@@ -149,8 +149,8 @@ public abstract class BaseKnnVectorsFormatTestCase extends BaseIndexFileFormatTe
         IllegalArgumentException expected =
             expectThrows(IllegalArgumentException.class, () -> w2.addDocument(doc2));
         assertEquals(
-            "cannot change field \"f\" from vector dimension=4, vector similarity function=EUCLIDEAN "
-                + "to inconsistent vector dimension=1, vector similarity function=EUCLIDEAN",
+            "cannot change field \"f\" from vector dimension=4 "
+                + "to inconsistent vector dimension=1",
             expected.getMessage());
       }
     }
@@ -249,8 +249,8 @@ public abstract class BaseKnnVectorsFormatTestCase extends BaseIndexFileFormatTe
             expectThrows(
                 IllegalArgumentException.class, () -> w2.addIndexes(new Directory[] {dir}));
         assertEquals(
-            "cannot change field \"f\" from vector dimension=5, vector similarity function=EUCLIDEAN "
-                + "to inconsistent vector dimension=4, vector similarity function=EUCLIDEAN",
+            "cannot change field \"f\" from vector dimension=5 "
+                + "to inconsistent vector dimension=4",
             expected.getMessage());
       }
     }
@@ -274,8 +274,8 @@ public abstract class BaseKnnVectorsFormatTestCase extends BaseIndexFileFormatTe
                   IllegalArgumentException.class,
                   () -> w2.addIndexes(new CodecReader[] {(CodecReader) getOnlyLeafReader(r)}));
           assertEquals(
-              "cannot change field \"f\" from vector dimension=5, vector similarity function=EUCLIDEAN "
-                  + "to inconsistent vector dimension=4, vector similarity function=EUCLIDEAN",
+              "cannot change field \"f\" from vector dimension=5 "
+                  + "to inconsistent vector dimension=4",
               expected.getMessage());
         }
       }
@@ -298,8 +298,8 @@ public abstract class BaseKnnVectorsFormatTestCase extends BaseIndexFileFormatTe
           IllegalArgumentException expected =
               expectThrows(IllegalArgumentException.class, () -> TestUtil.addIndexesSlowly(w2, r));
           assertEquals(
-              "cannot change field \"f\" from vector dimension=5, vector similarity function=EUCLIDEAN "
-                  + "to inconsistent vector dimension=4, vector similarity function=EUCLIDEAN",
+              "cannot change field \"f\" from vector dimension=5 "
+                  + "to inconsistent vector dimension=4",
               expected.getMessage());
         }
       }

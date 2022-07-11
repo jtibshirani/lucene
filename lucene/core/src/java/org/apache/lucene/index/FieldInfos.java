@@ -456,12 +456,7 @@ public class FieldInfos implements Iterable<FieldInfo> {
           fi.getPointNumBytes());
 
       FieldVectorProperties props = vectorProps.get(fieldName);
-      verifySameVectorOptions(
-          fieldName,
-          props.numDimensions,
-          props.similarityFunction,
-          fi.getVectorDimension(),
-          fi.getVectorSimilarityFunction());
+      verifySameVectorOptions(fieldName, props.numDimensions, fi.getVectorDimension());
     }
 
     /**

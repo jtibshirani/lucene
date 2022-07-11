@@ -70,7 +70,8 @@ public abstract class VectorValues extends DocIdSetIterator {
 
   /**
    * Compute the similarity score between the provided vector and the vector value for current
-   * document ID. A higher score means that the document vector is more similar to the target vector.
+   * document ID. A higher score means that the document vector is more similar to the target
+   * vector.
    *
    * @return the similarity score
    */
