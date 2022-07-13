@@ -53,52 +53,9 @@ public abstract class BufferingKnnVectorsWriter extends KnnVectorsWriter {
       System.arraycopy(fields, 0, newFields, 0, fields.length);
       fields = newFields;
     }
-    FieldWriter newField = new FieldWriter(fieldInfo);
+    FieldWriter newField = new FieldWriter(fieldInfo, this);
     fields[fields.length - 1] = newField;
     return newField;
-  }
-
-  @Override
-  public void flush(int maxDoc, Sorter.DocMap sortMap) throws IOException {
-    for (FieldWriter fieldData : fields) {
-      KnnVectorsReader knnVectorsReader =
-          new KnnVectorsReader() {
-            @Override
-            public long ramBytesUsed() {
-              return 0;
-            }
-
-            @Override
-            public void close() {
-              throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public void checkIntegrity() {
-              throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public VectorValues getVectorValues(String field) throws IOException {
-              VectorValues vectorValues =
-                  new BufferedVectorValues(
-                      fieldData.docsWithField,
-                      fieldData.vectors,
-                      fieldData.fieldInfo.getVectorDimension());
-              return sortMap != null
-                  ? new VectorValues.SortingVectorValues(vectorValues, sortMap)
-                  : vectorValues;
-            }
-
-            @Override
-            public TopDocs search(
-                String field, float[] target, int k, Bits acceptDocs, int visitedLimit) {
-              throw new UnsupportedOperationException();
-            }
-          };
-
-      writeField(fieldData.fieldInfo, knnVectorsReader, maxDoc);
-    }
   }
 
   @Override
@@ -122,14 +79,16 @@ public abstract class BufferingKnnVectorsWriter extends KnnVectorsWriter {
 
   private static class FieldWriter extends KnnFieldVectorsWriter {
     private final FieldInfo fieldInfo;
+    private final BufferingKnnVectorsWriter bufferingWriter;
     private final int dim;
     private final DocsWithFieldSet docsWithField;
     private final List<float[]> vectors;
 
     private int lastDocID = -1;
 
-    public FieldWriter(FieldInfo fieldInfo) {
+    public FieldWriter(FieldInfo fieldInfo, BufferingKnnVectorsWriter bufferingWriter) {
       this.fieldInfo = fieldInfo;
+      this.bufferingWriter = bufferingWriter;
       this.dim = fieldInfo.getVectorDimension();
       this.docsWithField = new DocsWithFieldSet();
       vectors = new ArrayList<>();
@@ -156,6 +115,47 @@ public abstract class BufferingKnnVectorsWriter extends KnnVectorsWriter {
       docsWithField.add(docID);
       vectors.add(ArrayUtil.copyOfSubArray(vectorValue, 0, vectorValue.length));
       lastDocID = docID;
+    }
+
+    @Override
+    public void flush(int maxDoc, Sorter.DocMap sortMap) throws IOException {
+      KnnVectorsReader knnVectorsReader =
+          new KnnVectorsReader() {
+            @Override
+            public long ramBytesUsed() {
+              return 0;
+            }
+
+            @Override
+            public void close() {
+              throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void checkIntegrity() {
+              throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public VectorValues getVectorValues(String field) throws IOException {
+              VectorValues vectorValues =
+                  new BufferedVectorValues(
+                      docsWithField,
+                      vectors,
+                      fieldInfo.getVectorDimension());
+              return sortMap != null
+                  ? new VectorValues.SortingVectorValues(vectorValues, sortMap)
+                  : vectorValues;
+            }
+
+            @Override
+            public TopDocs search(
+                String field, float[] target, int k, Bits acceptDocs, int visitedLimit) {
+              throw new UnsupportedOperationException();
+            }
+          };
+
+      bufferingWriter.writeField(fieldInfo, knnVectorsReader, maxDoc);
     }
 
     @Override

@@ -110,13 +110,6 @@ public abstract class PerFieldKnnVectorsFormat extends KnnVectorsFormat {
     }
 
     @Override
-    public void flush(int maxDoc, Sorter.DocMap sortMap) throws IOException {
-      for (WriterAndSuffix was : formats.values()) {
-        was.writer.flush(maxDoc, sortMap);
-      }
-    }
-
-    @Override
     public void mergeOneField(FieldInfo fieldInfo, KnnVectorsReader knnVectorsReader)
         throws IOException {
       getInstance(fieldInfo).mergeOneField(fieldInfo, knnVectorsReader);

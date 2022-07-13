@@ -184,11 +184,6 @@ public class TestPerFieldKnnVectorsFormat extends BaseKnnVectorsFormatTestCase {
         }
 
         @Override
-        public void flush(int maxDoc, Sorter.DocMap sortMap) throws IOException {
-          writer.flush(maxDoc, sortMap);
-        }
-
-        @Override
         public void mergeOneField(FieldInfo fieldInfo, KnnVectorsReader knnVectorsReader)
             throws IOException {
           fieldsWritten.add(fieldInfo.name);

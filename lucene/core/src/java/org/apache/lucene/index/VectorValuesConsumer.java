@@ -17,6 +17,7 @@
 
 package org.apache.lucene.index;
 
+import java.io.Closeable;
 import java.io.IOException;
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.KnnFieldVectorsWriter;
@@ -32,7 +33,7 @@ import org.apache.lucene.util.InfoStream;
  * Streams vector values for indexing to the given codec's vectors writer. The codec's vectors
  * writer is responsible for buffering and processing vectors.
  */
-class VectorValuesConsumer {
+class VectorValuesConsumer implements Closeable {
   private final Codec codec;
   private final Directory directory;
   private final SegmentInfo segmentInfo;
@@ -70,10 +71,9 @@ class VectorValuesConsumer {
     return writer.addField(fieldInfo);
   }
 
-  void flush(SegmentWriteState state, Sorter.DocMap sortMap) throws IOException {
+  void finish() throws IOException {
     if (writer == null) return;
     try {
-      writer.flush(state.segmentInfo.maxDoc(), sortMap);
       writer.finish();
     } finally {
       IOUtils.close(writer);
@@ -82,6 +82,10 @@ class VectorValuesConsumer {
 
   void abort() {
     IOUtils.closeWhileHandlingException(writer);
+  }
+
+  public void close() throws IOException {
+    IOUtils.close(writer);
   }
 
   public Accountable getAccountable() {

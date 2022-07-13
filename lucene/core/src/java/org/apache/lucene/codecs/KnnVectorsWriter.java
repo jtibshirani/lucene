@@ -40,9 +40,6 @@ public abstract class KnnVectorsWriter implements Accountable, Closeable {
   /** Add new field for indexing */
   public abstract KnnFieldVectorsWriter addField(FieldInfo fieldInfo) throws IOException;
 
-  /** Flush all buffered data on disk * */
-  public abstract void flush(int maxDoc, Sorter.DocMap sortMap) throws IOException;
-
   /** Write field for merging */
   public abstract void mergeOneField(FieldInfo fieldInfo, KnnVectorsReader knnVectorsReader)
       throws IOException;

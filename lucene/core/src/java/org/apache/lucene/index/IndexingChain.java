@@ -31,6 +31,7 @@ import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.codecs.DocValuesConsumer;
 import org.apache.lucene.codecs.DocValuesFormat;
 import org.apache.lucene.codecs.KnnFieldVectorsWriter;
+import org.apache.lucene.codecs.KnnVectorsWriter;
 import org.apache.lucene.codecs.NormsConsumer;
 import org.apache.lucene.codecs.NormsFormat;
 import org.apache.lucene.codecs.NormsProducer;
@@ -264,7 +265,7 @@ final class IndexingChain implements Accountable {
     }
 
     t0 = System.nanoTime();
-    vectorValuesConsumer.flush(state, sortMap);
+    writeVectorValues(state, sortMap);
     if (infoStream.isEnabled("IW")) {
       infoStream.message("IW", ((System.nanoTime() - t0) / 1000000) + " msec to write vectors");
     }
@@ -458,6 +459,50 @@ final class IndexingChain implements Accountable {
         IOUtils.close(normsConsumer);
       } else {
         IOUtils.closeWhileHandlingException(normsConsumer);
+      }
+    }
+  }
+
+  /** Writes all buffered doc values (called from {@link #flush}). */
+  private void writeVectorValues(SegmentWriteState state, Sorter.DocMap sortMap) throws IOException {
+    boolean success = false;
+    try {
+      for (int i = 0; i < fieldHash.length; i++) {
+        PerField perField = fieldHash[i];
+        while (perField != null) {
+          if (perField.knnFieldVectorsWriter != null) {
+            if (perField.fieldInfo.hasVectorValues() == false) {
+              // BUG
+              throw new AssertionError(
+                  "segment="
+                      + state.segmentInfo
+                      + ": field=\""
+                      + perField.fieldInfo.name
+                      + "\" has no vectors but wrote them");
+            }
+            perField.knnFieldVectorsWriter.flush(state.segmentInfo.maxDoc(), sortMap);
+            perField.knnFieldVectorsWriter = null;
+          } else if (perField.fieldInfo != null
+              && perField.fieldInfo.hasVectorValues()) {
+            // BUG
+            throw new AssertionError(
+                "segment="
+                    + state.segmentInfo
+                    + ": field=\""
+                    + perField.fieldInfo.name
+                    + "\" has vectors but did not write them");
+          }
+          perField = perField.next;
+        }
+      }
+
+      vectorValuesConsumer.finish();
+      success = true;
+    } finally {
+      if (success) {
+        IOUtils.close(vectorValuesConsumer);
+      } else {
+        IOUtils.closeWhileHandlingException(vectorValuesConsumer);
       }
     }
   }

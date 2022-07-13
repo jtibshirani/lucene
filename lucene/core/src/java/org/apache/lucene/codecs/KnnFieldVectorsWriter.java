@@ -18,6 +18,8 @@
 package org.apache.lucene.codecs;
 
 import java.io.IOException;
+
+import org.apache.lucene.index.Sorter;
 import org.apache.lucene.util.Accountable;
 
 /** Vectors' writer for a field */
@@ -28,4 +30,6 @@ public abstract class KnnFieldVectorsWriter implements Accountable {
 
   /** Add new docID with its vector value to the given field for indexing */
   public abstract void addValue(int docID, float[] vectorValue) throws IOException;
+
+  public abstract void flush(int maxDoc, Sorter.DocMap sortMap) throws IOException;
 }

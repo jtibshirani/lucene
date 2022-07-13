@@ -66,11 +66,6 @@ public class AssertingKnnVectorsFormat extends KnnVectorsFormat {
     }
 
     @Override
-    public void flush(int maxDoc, Sorter.DocMap sortMap) throws IOException {
-      delegate.flush(maxDoc, sortMap);
-    }
-
-    @Override
     public void mergeOneField(FieldInfo fieldInfo, KnnVectorsReader knnVectorsReader)
         throws IOException {
       assert fieldInfo != null;
