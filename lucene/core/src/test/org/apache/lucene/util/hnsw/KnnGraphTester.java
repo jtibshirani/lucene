@@ -373,15 +373,15 @@ public class KnnGraphTester {
         IndexSearcher searcher = new IndexSearcher(reader);
         numDocs = reader.maxDoc();
         Query bitSetQuery = prefilter ? new BitSetQuery(matchDocs) : null;
-        for (int i = 0; i < numIters; i++) {
-          // warm up
-          float[] target = targetReader.next();
-          if (prefilter) {
-            doKnnVectorQuery(searcher, KNN_FIELD, target, topK, fanout, bitSetQuery);
-          } else {
-            doKnnVectorQuery(searcher, KNN_FIELD, target, (int) (topK / selectivity), fanout, null);
-          }
-        }
+//        for (int i = 0; i < numIters; i++) {
+//          // warm up
+//          float[] target = targetReader.next();
+//          if (prefilter) {
+//            doKnnVectorQuery(searcher, KNN_FIELD, target, topK, fanout, bitSetQuery);
+//          } else {
+//            doKnnVectorQuery(searcher, KNN_FIELD, target, (int) (topK / selectivity), fanout, null);
+//          }
+//        }
         targetReader.reset();
         start = System.nanoTime();
         cpuTimeStartNs = bean.getCurrentThreadCpuTime();
