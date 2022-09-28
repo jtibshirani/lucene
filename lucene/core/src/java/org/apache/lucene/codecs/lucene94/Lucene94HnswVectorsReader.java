@@ -46,6 +46,7 @@ import org.apache.lucene.util.hnsw.HnswGraph;
 import org.apache.lucene.util.hnsw.HnswGraphSearcher;
 import org.apache.lucene.util.hnsw.NeighborQueue;
 import org.apache.lucene.util.packed.DirectMonotonicReader;
+import org.apache.lucene.util.packed.PackedInts;
 
 /**
  * Reads vectors from the index segments along with index data structures supporting KNN search.
@@ -319,8 +320,12 @@ public final class Lucene94HnswVectorsReader extends KnnVectorsReader {
     final int dimension;
     final int size;
     final int[][] nodesByLevel;
+
     // for each level the start offsets in vectorIndex file from where to read neighbours
     final long[] graphOffsetsByLevel;
+    final int bitsRequiredForConn;
+    final long bytesForConns;
+    final long bytesForConns0;
 
     // the following four variables used to read docIds encoded by IndexDISI
     // special values of docsWithFieldOffset are -1 and -2
@@ -392,17 +397,21 @@ public final class Lucene94HnswVectorsReader extends KnnVectorsReader {
 
       // calculate for each level the start offsets in vectorIndex file from where to read
       // neighbours
+      this.bitsRequiredForConn = PackedInts.bitsRequired(size);
+      this.bytesForConns = Integer.BYTES + PackedInts.Format.PACKED.byteCount(PackedInts.VERSION_CURRENT, M, bitsRequiredForConn);
+      this.bytesForConns0 = Integer.BYTES + PackedInts.Format.PACKED.byteCount(PackedInts.VERSION_CURRENT, M * 2, bitsRequiredForConn);
+
       graphOffsetsByLevel = new long[numLevels];
       for (int level = 0; level < numLevels; level++) {
         if (level == 0) {
           graphOffsetsByLevel[level] = 0;
         } else if (level == 1) {
           int numNodesOnLevel0 = size;
-          graphOffsetsByLevel[level] = (1 + (M * 2)) * Integer.BYTES * numNodesOnLevel0;
+          graphOffsetsByLevel[level] = bytesForConns0 * numNodesOnLevel0;
         } else {
           int numNodesOnPrevLevel = nodesByLevel[level - 1].length;
           graphOffsetsByLevel[level] =
-              graphOffsetsByLevel[level - 1] + (1 + M) * Integer.BYTES * numNodesOnPrevLevel;
+              graphOffsetsByLevel[level - 1] + bytesForConns * numNodesOnPrevLevel;
         }
       }
     }
@@ -417,16 +426,20 @@ public final class Lucene94HnswVectorsReader extends KnnVectorsReader {
 
     final IndexInput dataIn;
     final int[][] nodesByLevel;
-    final long[] graphOffsetsByLevel;
     final int numLevels;
     final int entryNode;
     final int size;
+
+    final long[] graphOffsetsByLevel;
+    final int bitsRequiredForConn;
     final long bytesForConns;
     final long bytesForConns0;
 
     int arcCount;
     int arcUpTo;
     int arc;
+    PackedInts.ReaderIterator connectionReader;
+
 
     OffHeapHnswGraph(FieldEntry entry, IndexInput dataIn) {
       this.dataIn = dataIn;
@@ -434,9 +447,11 @@ public final class Lucene94HnswVectorsReader extends KnnVectorsReader {
       this.numLevels = entry.numLevels;
       this.entryNode = numLevels > 1 ? nodesByLevel[numLevels - 1][0] : 0;
       this.size = entry.size();
+
       this.graphOffsetsByLevel = entry.graphOffsetsByLevel;
-      this.bytesForConns = ((long) entry.M + 1) * Integer.BYTES;
-      this.bytesForConns0 = ((long) (entry.M * 2) + 1) * Integer.BYTES;
+      this.bitsRequiredForConn = entry.bitsRequiredForConn;
+      this.bytesForConns = entry.bytesForConns;
+      this.bytesForConns0 = entry.bytesForConns0;
     }
 
     @Override
@@ -451,6 +466,8 @@ public final class Lucene94HnswVectorsReader extends KnnVectorsReader {
       // unsafe; no bounds checking
       dataIn.seek(graphDataOffset);
       arcCount = dataIn.readInt();
+      connectionReader = PackedInts.getReaderIteratorNoHeader(dataIn, PackedInts.Format.PACKED,
+          PackedInts.VERSION_CURRENT, arcCount, this.bitsRequiredForConn, 1);
       arc = -1;
       arcUpTo = 0;
     }
@@ -466,7 +483,7 @@ public final class Lucene94HnswVectorsReader extends KnnVectorsReader {
         return NO_MORE_DOCS;
       }
       ++arcUpTo;
-      arc = dataIn.readInt();
+      arc = (int) connectionReader.next();
       return arc;
     }
 

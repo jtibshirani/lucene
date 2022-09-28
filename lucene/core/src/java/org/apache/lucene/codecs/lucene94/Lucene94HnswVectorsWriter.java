@@ -18,6 +18,7 @@
 package org.apache.lucene.codecs.lucene94;
 
 import static org.apache.lucene.codecs.lucene94.Lucene94HnswVectorsFormat.DIRECT_MONOTONIC_BLOCK_SHIFT;
+import static org.apache.lucene.codecs.lucene94.Lucene94HnswVectorsFormat.VERSION_CURRENT;
 import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
 
 import java.io.IOException;
@@ -52,6 +53,7 @@ import org.apache.lucene.util.hnsw.HnswGraphBuilder;
 import org.apache.lucene.util.hnsw.NeighborArray;
 import org.apache.lucene.util.hnsw.OnHeapHnswGraph;
 import org.apache.lucene.util.packed.DirectMonotonicWriter;
+import org.apache.lucene.util.packed.PackedInts;
 
 /**
  * Writes vector values and knn graphs to index segments.
@@ -357,7 +359,9 @@ public final class Lucene94HnswVectorsWriter extends KnnVectorsWriter {
       throws IOException {
     int size = neighbors.size();
     vectorIndex.writeInt(size);
-
+    int bitsRequired = PackedInts.bitsRequired(maxOrd);
+    PackedInts.Writer packedIntsWriter = PackedInts.getWriterNoHeader(
+        vectorIndex, PackedInts.Format.PACKED, maxConnOnLevel, bitsRequired, 1);
     // Destructively modify; it's ok we are discarding it after this
     int[] nnodes = neighbors.node();
     for (int i = 0; i < size; i++) {
@@ -367,13 +371,10 @@ public final class Lucene94HnswVectorsWriter extends KnnVectorsWriter {
     for (int i = 0; i < size; i++) {
       int nnode = nnodes[i];
       assert nnode < maxOrd : "node too large: " + nnode + ">=" + maxOrd;
-      vectorIndex.writeInt(nnode);
+      packedIntsWriter.add(nnode);
     }
-    // if number of connections < maxConn,
-    // add bogus values up to maxConn to have predictable offsets
-    for (int i = size; i < maxConnOnLevel; i++) {
-      vectorIndex.writeInt(0);
-    }
+    // if number of connections < maxConn, this call automatically adds padding
+    packedIntsWriter.finish();
   }
 
   @Override
@@ -451,6 +452,8 @@ public final class Lucene94HnswVectorsWriter extends KnnVectorsWriter {
     if (graph == null) return;
     // write vectors' neighbours on each level into the vectorIndex file
     int countOnLevel0 = graph.size();
+    int bitsRequired = PackedInts.bitsRequired(countOnLevel0);
+
     for (int level = 0; level < graph.numLevels(); level++) {
       int maxConnOnLevel = level == 0 ? (M * 2) : M;
       NodesIterator nodesOnLevel = graph.getNodesOnLevel(level);
@@ -462,16 +465,15 @@ public final class Lucene94HnswVectorsWriter extends KnnVectorsWriter {
         // Destructively modify; it's ok we are discarding it after this
         int[] nnodes = neighbors.node();
         Arrays.sort(nnodes, 0, size);
+        PackedInts.Writer packedIntsWriter = PackedInts.getWriterNoHeader(
+            vectorIndex, PackedInts.Format.PACKED, maxConnOnLevel, bitsRequired, 1);
         for (int i = 0; i < size; i++) {
           int nnode = nnodes[i];
           assert nnode < countOnLevel0 : "node too large: " + nnode + ">=" + countOnLevel0;
-          vectorIndex.writeInt(nnode);
+          packedIntsWriter.add(nnode);
         }
-        // if number of connections < maxConn, add bogus values up to maxConn to have predictable
-        // offsets
-        for (int i = size; i < maxConnOnLevel; i++) {
-          vectorIndex.writeInt(0);
-        }
+        // if number of connections < maxConn, this call automatically adds padding
+        packedIntsWriter.finish();
       }
     }
   }
